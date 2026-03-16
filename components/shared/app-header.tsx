@@ -291,7 +291,7 @@ function AuthenticatedHeader({
           textClassName="text-base tracking-tight text-primary-foreground/80"
         />
 
-        <nav className="hidden md:flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => (
             <Link
               key={link.label}
@@ -310,9 +310,9 @@ function AuthenticatedHeader({
               />
             </Link>
           ))}
-        </nav>
 
-        <div className="hidden md:flex items-center gap-3">
+          <span className="text-primary-foreground/20 text-lg font-thin select-none mx-1">|</span>
+
           {variant === "user" && (
             <>
               <ProfileSwitcher
