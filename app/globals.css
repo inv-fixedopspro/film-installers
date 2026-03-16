@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 0 0% 20%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 85%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 0 0% 20%;
+    --chart-1: 0 0% 35%;
+    --chart-2: 0 0% 50%;
+    --chart-3: 0 0% 28%;
+    --chart-4: 0 0% 60%;
+    --chart-5: 0 0% 40%;
+    --radius: 0.5rem;
+
+    --tan: 0 0% 75%;
+    --light-brown: 0 0% 55%;
+    --dark-brown: 0 0% 20%;
+    --charcoal: 0 0% 20%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --highlight: 0 0% 94%;
+    --highlight-foreground: 0 0% 15%;
+
+    --brand: 30 45% 75%;
+    --brand-foreground: 0 0% 100%;
+    --brand-muted: 38 92% 95%;
+    --brand-muted-foreground: 38 80% 30%;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 0 0% 80%;
+    --primary-foreground: 0 0% 7%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 58%;
+    --accent: 0 0% 22%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 80%;
+    --chart-1: 0 0% 40%;
+    --chart-2: 0 0% 52%;
+    --chart-3: 0 0% 32%;
+    --chart-4: 0 0% 62%;
+    --chart-5: 0 0% 45%;
+
+    --tan: 0 0% 35%;
+    --light-brown: 0 0% 45%;
+    --dark-brown: 0 0% 80%;
+    --charcoal: 0 0% 85%;
+
+    --success: 142 71% 35%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 40%;
+    --warning-foreground: 0 0% 100%;
+
+    --highlight: 0 0% 14%;
+    --highlight-foreground: 0 0% 95%;
+
+    --brand: 38 92% 50%;
+    --brand-foreground: 0 0% 7%;
+    --brand-muted: 38 80% 15%;
+    --brand-muted-foreground: 38 92% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

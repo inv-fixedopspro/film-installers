@@ -29,7 +29,7 @@ async function sendEmail({ to, subject, html, text }: SendEmailParams): Promise<
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: to }] }],
-        from: { email: `noreply@${APP_DOMAIN}`, name: APP_NAME },
+        from: { email: process.env.SENDGRID_FROM_EMAIL },
         subject,
         content: [
           ...(text ? [{ type: "text/plain", value: text }] : []),
