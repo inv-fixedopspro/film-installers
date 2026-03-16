@@ -35,7 +35,7 @@ export const employerProfileSchema = z.object({
   hq_city: z.string().min(1, "City is required").max(100, "City name is too long"),
   hq_state: stateSchema,
   employee_count: z.enum(["1_to_5", "5_to_10", "10_to_20", "25_plus"]),
-  location_count: z.string().min(1, "Number of locations is required"),
+  location_count: z.string().optional(),
   is_actively_hiring: z.boolean(),
   is_vendor: z.boolean(),
   is_distributor: z.boolean(),

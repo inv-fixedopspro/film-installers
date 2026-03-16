@@ -231,6 +231,18 @@ File: `middleware.ts` (project root)
 
 Supabase email/password auth. No magic links, no OAuth, no social providers.
 
+### Email Verification — Single System
+
+**`profiles.email_verified_at` is the sole source of truth for email verification.** Supabase's built-in email confirmation gate is intentionally bypassed.
+
+How it works:
+- Registration calls `supabase.auth.admin.createUser()` with `email_confirm: true` — this tells Supabase to consider the auth record confirmed immediately, so it never intercepts logins
+- A custom token is written to `email_verifications` and a verification email is sent
+- Login checks `profiles.email_verified_at` — if null, the user is redirected to `/verify-email` regardless of their auth record state
+- When the user clicks the email link, `verify_email_token` RPC sets `email_verifications.verified_at` and `profiles.email_verified_at` atomically
+
+**Never add logic that checks `auth.users.email_confirmed_at` or handles Supabase's "Email not confirmed" error.** That path no longer exists in this codebase.
+
 | Action | Route | Method |
 |--------|-------|--------|
 | Register | `/api/auth/register` | POST |
@@ -833,6 +845,20 @@ Every new table must have RLS enabled. Policies must follow these patterns:
 
 All RPC functions use `SECURITY DEFINER`, pass data via `jsonb` params, and return `jsonb`. TypeScript wrappers are in `lib/db/`.
 
+**`search_path` and Extension Functions**
+
+All RPCs declare `SET search_path = public`. This locks the function's schema search path to `public` only. The `pgcrypto` and `uuid-ossp` extensions are installed in the `extensions` schema, not `public`. Any RPC that calls these functions **must use the fully-qualified schema prefix**:
+
+```sql
+-- Correct
+v_token := encode(extensions.gen_random_bytes(24), 'hex');
+
+-- Wrong — will fail with "function gen_random_bytes(integer) does not exist"
+v_token := encode(gen_random_bytes(24), 'hex');
+```
+
+This rule applies to any extension-provided function: `extensions.gen_random_bytes()`, `extensions.gen_random_uuid()`, `extensions.pgp_sym_encrypt()`, etc. Never call extension functions without the `extensions.` prefix inside a `SECURITY DEFINER` function that uses `SET search_path = public`.
+
 #### Employer Profile RPCs (`lib/db/profiles.ts`)
 
 | Function | Params | Returns | Notes |
@@ -1044,4 +1070,4 @@ If a file exceeds ~250 lines, split it. Components with sub-components, helpers,
 
 ---
 
-*Last updated: Phase 1 + 2 foundation complete. Phase 3 resume builder complete. Phase 3.1 resume-level flagging complete. Employer Phase A–E complete (see above). Employer Phase F complete: `/onboarding/select-type` rebuilt with three cards — Installer (routes to `/onboarding/installer`), Employer (routes to `/onboarding/employer`), Join a Team (informational only — explains invitation-only access, no form, no navigation); `lib/types/database.ts` fully audited and completed — `consent_log`, `deletion_requests`, `data_export_requests`, `dpa_requests` tables added to `Database` interface with Row/Insert/Update shapes from live DB schema, corresponding `ConsentLog`, `DeletionRequest`, `DataExportRequest`, `DpaRequest` type aliases exported; `Database.Enums` block verified to contain only the 8 actual DB pg enum types; all DB enums and TypeScript types confirmed in sync per section 13 rule; BUILDREF section 4 Onboarding Flow paragraph updated to document the three-card select-type flow and the invitation-only team join path. Phase A addendum: `is_distributor` boolean added to `employer_profiles` (migration `20260315165407`, RPC update `20260315165646`); both `is_vendor` and `is_distributor` are now fully wired end-to-end — DB column → RPC → TypeScript type → validation schema → creation form → dashboard display; section 13 employer_profiles logic-driving columns updated; section 14 Feature Status Map updated. GDPR/EU/UK infrastructure addendum: all EU/UK serving infrastructure is live and complete prior to Phase G — server-side IP region detection (`lib/geo/region.ts`), `profiles.country_code` column, `dpa_requests` table with RLS, GDPR-aware `CookieConsentBanner`, DPA page (`/legal/dpa`), GDPR rights in Privacy Policy, ePrivacy/PECR cookie policy, legal document versioning (`lib/legal/versions.ts`), and 7-year anonymized retention for consent/DPA records; section 8 Data Privacy rules updated with EU/UK GDPR subsection, two-layer region detection description, and 7-year retention note; section 14 Feature Status Map corrected — GDPR infrastructure moved to its own "Complete" table, remaining open item (DPA enforcement flow) listed under "Not Started" Phase 7. Next: Phase G (public installer/employer profile pages with visibility gating, installer profile inline-edit parity, and network/search scaffolding).*
+*Last updated: Phase 1 + 2 foundation complete. Phase 3 resume builder complete. Phase 3.1 resume-level flagging complete. Employer Phase A–E complete (see above). Employer Phase F complete: `/onboarding/select-type` rebuilt with three cards — Installer (routes to `/onboarding/installer`), Employer (routes to `/onboarding/employer`), Join a Team (informational only — explains invitation-only access, no form, no navigation); `lib/types/database.ts` fully audited and completed — `consent_log`, `deletion_requests`, `data_export_requests`, `dpa_requests` tables added to `Database` interface with Row/Insert/Update shapes from live DB schema, corresponding `ConsentLog`, `DeletionRequest`, `DataExportRequest`, `DpaRequest` type aliases exported; `Database.Enums` block verified to contain only the 8 actual DB pg enum types; all DB enums and TypeScript types confirmed in sync per section 13 rule; BUILDREF section 4 Onboarding Flow paragraph updated to document the three-card select-type flow and the invitation-only team join path. Phase A addendum: `is_distributor` boolean added to `employer_profiles` (migration `20260315165407`, RPC update `20260315165646`); both `is_vendor` and `is_distributor` are now fully wired end-to-end — DB column → RPC → TypeScript type → validation schema → creation form → dashboard display; section 13 employer_profiles logic-driving columns updated; section 14 Feature Status Map updated. GDPR/EU/UK infrastructure addendum: all EU/UK serving infrastructure is live and complete prior to Phase G — server-side IP region detection (`lib/geo/region.ts`), `profiles.country_code` column, `dpa_requests` table with RLS, GDPR-aware `CookieConsentBanner`, DPA page (`/legal/dpa`), GDPR rights in Privacy Policy, ePrivacy/PECR cookie policy, legal document versioning (`lib/legal/versions.ts`), and 7-year anonymized retention for consent/DPA records; section 8 Data Privacy rules updated with EU/UK GDPR subsection, two-layer region detection description, and 7-year retention note; section 14 Feature Status Map corrected — GDPR infrastructure moved to its own "Complete" table, remaining open item (DPA enforcement flow) listed under "Not Started" Phase 7. Auth system fix: dual email verification conflict resolved — `email_confirm: true` used at registration to bypass Supabase's built-in gate entirely; `profiles.email_verified_at` is now the single source of truth; Supabase "Email not confirmed" intercept removed from login route; `auth.users.email_confirmed_at` synced for all existing users via migration; section 6 updated with "Email Verification — Single System" documentation. RPC extension schema fix: `invite_team_member` token generation updated from `gen_random_bytes(24)` to `extensions.gen_random_bytes(24)`; section 13 RPC Function Reference updated with `search_path` + extension schema rule documenting that all extension-provided functions (`pgcrypto`, `uuid-ossp`, etc.) must use the `extensions.` prefix inside `SECURITY DEFINER` RPCs that declare `SET search_path = public`. Next: Phase G (public installer/employer profile pages with visibility gating, installer profile inline-edit parity, and network/search scaffolding).*
