@@ -38,8 +38,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const PUBLIC_NAV_LINKS = [
-  { href: "/jobs", label: "Jobs" },
-  { href: "/forum", label: "Forum" },
   { href: "/blog", label: "Blog" },
 ];
 
@@ -117,7 +115,7 @@ function PublicHeader() {
           textClassName="text-base tracking-tight text-primary-foreground/80"
         />
 
-        <nav className="hidden md:flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-3">
           {PUBLIC_NAV_LINKS.map((link) => (
             <Link
               key={link.label}
@@ -138,9 +136,9 @@ function PublicHeader() {
               />
             </Link>
           ))}
-        </nav>
 
-        <div className="hidden md:flex items-center gap-3">
+          <span className="text-primary-foreground/20 text-lg font-thin select-none">|</span>
+
           <Link href="/shop">
             <Button
               variant="ghost"
