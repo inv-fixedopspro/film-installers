@@ -215,3 +215,62 @@ If you weren't expecting this invitation, you can safely ignore this email.
     text,
   });
 }
+
+export async function sendTeamInvitationEmail(
+  email: string,
+  token: string,
+  companyName?: string,
+  inviterName?: string
+): Promise<EmailResult> {
+  const inviteUrl = `https://${APP_DOMAIN}/invite/team/${token}`;
+  const companyText = companyName ? ` to join the ${companyName} team` : " to join a company team";
+  const inviterText = inviterName ? ` by ${inviterName}` : "";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #5C4033 0%, #8B7355 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">${APP_NAME}</h1>
+      </div>
+      <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 8px 8px;">
+        <h2 style="color: #333333; margin-top: 0;">You've Been Invited to a Team!</h2>
+        <p>You've been invited${inviterText}${companyText} on ${APP_NAME}.</p>
+        <p>Click the button below to accept your invitation and get started.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${inviteUrl}" style="display: inline-block; background-color: #5C4033; color: #ffffff; text-decoration: none; padding: 14px 30px; border-radius: 6px; font-weight: 600;">Accept Team Invitation</a>
+        </div>
+        <p style="color: #666666; font-size: 14px;">If the button doesn't work, copy and paste this link into your browser:</p>
+        <p style="color: #666666; font-size: 14px; word-break: break-all;">${inviteUrl}</p>
+        <p style="color: #666666; font-size: 14px;">This invitation will expire in 7 days.</p>
+        <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 20px 0;">
+        <p style="color: #999999; font-size: 12px; text-align: center;">If you weren't expecting this invitation, you can safely ignore this email.</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `
+You've Been Invited to a Team on ${APP_NAME}!
+
+You've been invited${inviterText}${companyText} on ${APP_NAME}.
+
+Please visit the following link to accept your invitation:
+${inviteUrl}
+
+This invitation will expire in 7 days.
+
+If you weren't expecting this invitation, you can safely ignore this email.
+  `;
+
+  return sendEmail({
+    to: email,
+    subject: `You've been invited to a team on ${APP_NAME}`,
+    html,
+    text,
+  });
+}
