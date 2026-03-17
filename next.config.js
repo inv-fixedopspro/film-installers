@@ -33,6 +33,10 @@ const nextConfig = {
             key: "X-DNS-Prefetch-Control",
             value: "on",
           },
+          {
+            key: "Content-Security-Policy",
+            value: "upgrade-insecure-requests",
+          },
         ],
       },
     ];
