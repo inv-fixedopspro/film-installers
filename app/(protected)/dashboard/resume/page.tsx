@@ -4,9 +4,14 @@ import { getResumeByInstallerId } from "@/lib/db/resume";
 import { getSignedUrl } from "@/lib/storage/company-assets";
 import { ResumeForm } from "@/components/resume";
 import { BackLink } from "@/components/shared";
-import type { ExperienceLevel } from "@/lib/types/database";
+import type { ExperienceLevel, ServiceType, ExperienceYears } from "@/lib/types/database";
 
 export const metadata = { title: "Resume Builder" };
+
+export interface InstallerExperienceEntry {
+  service_type: ServiceType;
+  years_experience: ExperienceYears;
+}
 
 export interface InstallerContactInfo {
   email: string;
@@ -16,6 +21,7 @@ export interface InstallerContactInfo {
   experience_level: ExperienceLevel;
   photoUrl: string | null;
   hasPhoto: boolean;
+  installerExperience: InstallerExperienceEntry[];
 }
 
 export default async function ResumePage() {
@@ -41,6 +47,11 @@ export default async function ResumePage() {
 
   const { data: resume } = await getResumeByInstallerId(supabase, installerProfile.id);
 
+  const { data: experienceRows } = await supabase
+    .from("installer_experience")
+    .select("service_type, years_experience")
+    .eq("installer_profile_id", installerProfile.id);
+
   const installerName = `${installerProfile.first_name} ${installerProfile.last_name}`;
 
   let photoUrl: string | null = null;
@@ -57,6 +68,7 @@ export default async function ResumePage() {
     experience_level: installerProfile.experience_level as ExperienceLevel,
     photoUrl,
     hasPhoto: !!installerProfile.photo_storage_path,
+    installerExperience: (experienceRows ?? []) as InstallerExperienceEntry[],
   };
 
   return (

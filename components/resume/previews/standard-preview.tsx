@@ -2,6 +2,7 @@
 
 import type { ResumeFormData } from "@/lib/validations/resume";
 import type { InstallerContactInfo } from "@/app/(protected)/dashboard/resume/page";
+import { SERVICE_TYPES, EXPERIENCE_YEARS } from "@/lib/constants";
 
 function formatDateRange(
   startMonth: string,
@@ -58,6 +59,15 @@ export function StandardPreview({ data, installerName, contactInfo }: StandardPr
           {contactInfo?.experience_level && (
             <p style={{ fontSize: "10px", color: "#888", marginTop: "2px", marginBottom: 0 }}>
               {EXPERIENCE_LEVEL_LABELS[contactInfo.experience_level] ?? contactInfo.experience_level}
+            </p>
+          )}
+          {contactInfo?.experience_level === "experienced" && contactInfo.installerExperience?.length > 0 && (
+            <p style={{ fontSize: "10px", color: "#999", marginTop: "2px", marginBottom: 0 }}>
+              {contactInfo.installerExperience.map((exp) => {
+                const svc = SERVICE_TYPES.find((s) => s.value === exp.service_type)?.label ?? exp.service_type;
+                const yrs = EXPERIENCE_YEARS.find((y) => y.value === exp.years_experience)?.label ?? exp.years_experience;
+                return `${svc}: ${yrs}`;
+              }).join(" · ")}
             </p>
           )}
           {contactParts.length > 0 && (

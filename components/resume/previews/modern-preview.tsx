@@ -3,6 +3,7 @@
 import type { ResumeFormData } from "@/lib/validations/resume";
 import type { ResumeAccentColor } from "@/lib/types/database";
 import type { InstallerContactInfo } from "@/app/(protected)/dashboard/resume/page";
+import { SERVICE_TYPES, EXPERIENCE_YEARS } from "@/lib/constants";
 
 const ACCENT_HEX: Record<ResumeAccentColor, string> = {
   charcoal: "#3a3a3a",
@@ -87,10 +88,22 @@ export function ModernPreview({ data, installerName, accentColor, contactInfo }:
           <p style={{ fontSize: "10px", opacity: 0.8, margin: "0 0 4px 0", lineHeight: 1.4 }}>{data.headline}</p>
         )}
         {contactInfo?.experience_level && (
-          <p style={{ fontSize: "9px", opacity: 0.65, margin: "0 0 16px 0" }}>
+          <p style={{ fontSize: "9px", opacity: 0.65, margin: "0 0 4px 0" }}>
             {EXPERIENCE_LEVEL_LABELS[contactInfo.experience_level] ?? contactInfo.experience_level}
           </p>
         )}
+        {contactInfo?.experience_level === "experienced" && contactInfo.installerExperience?.length > 0 && (
+          <div style={{ marginBottom: "16px" }}>
+            {contactInfo.installerExperience.map((exp) => {
+              const svc = SERVICE_TYPES.find((s) => s.value === exp.service_type)?.label ?? exp.service_type;
+              const yrs = EXPERIENCE_YEARS.find((y) => y.value === exp.years_experience)?.label ?? exp.years_experience;
+              return (
+                <div key={exp.service_type} style={{ fontSize: "9px", opacity: 0.55 }}>{svc}: {yrs}</div>
+              );
+            })}
+          </div>
+        )}
+        {contactInfo?.experience_level !== "experienced" && <div style={{ marginBottom: "16px" }} />}
 
         {(contactInfo?.email || contactInfo?.phone || (contactInfo?.city && contactInfo?.state)) && (
           <div style={{ marginBottom: "20px" }}>
