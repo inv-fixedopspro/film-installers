@@ -2,11 +2,17 @@
 
 import type { ResumeFormData } from "@/lib/validations/resume";
 import type { ResumeAccentColor } from "@/lib/types/database";
+import type { InstallerContactInfo } from "@/app/(protected)/dashboard/resume/page";
 
 const ACCENT_HEX: Record<ResumeAccentColor, string> = {
   charcoal: "#3a3a3a",
   navy: "#1e3a5f",
   forest: "#2d5a3d",
+};
+
+const EXPERIENCE_LEVEL_LABELS: Record<string, string> = {
+  new_to_industry: "New to Industry",
+  experienced: "Experienced Professional",
 };
 
 function formatDateRange(
@@ -25,10 +31,12 @@ interface ModernPreviewProps {
   data: ResumeFormData;
   installerName?: string;
   accentColor: ResumeAccentColor;
+  contactInfo?: InstallerContactInfo;
 }
 
-export function ModernPreview({ data, installerName, accentColor }: ModernPreviewProps) {
+export function ModernPreview({ data, installerName, accentColor, contactInfo }: ModernPreviewProps) {
   const accent = ACCENT_HEX[accentColor];
+  const showPhoto = data.show_photo && contactInfo?.photoUrl;
 
   return (
     <div
@@ -56,11 +64,45 @@ export function ModernPreview({ data, installerName, accentColor }: ModernPrevie
           overflow: "hidden",
         }}
       >
+        {showPhoto && (
+          <div style={{ marginBottom: "16px", display: "flex", justifyContent: "center" }}>
+            <img
+              src={contactInfo!.photoUrl!}
+              alt=""
+              style={{
+                width: "72px",
+                height: "72px",
+                borderRadius: "50%",
+                objectFit: "cover",
+                border: "2px solid rgba(255,255,255,0.4)",
+              }}
+            />
+          </div>
+        )}
+
         <h1 style={{ fontSize: "18px", fontWeight: 700, lineHeight: 1.2, margin: "0 0 4px 0" }}>
           {installerName || "Your Name"}
         </h1>
         {data.headline && (
-          <p style={{ fontSize: "10px", opacity: 0.8, margin: "0 0 24px 0", lineHeight: 1.4 }}>{data.headline}</p>
+          <p style={{ fontSize: "10px", opacity: 0.8, margin: "0 0 4px 0", lineHeight: 1.4 }}>{data.headline}</p>
+        )}
+        {contactInfo?.experience_level && (
+          <p style={{ fontSize: "9px", opacity: 0.65, margin: "0 0 16px 0" }}>
+            {EXPERIENCE_LEVEL_LABELS[contactInfo.experience_level] ?? contactInfo.experience_level}
+          </p>
+        )}
+
+        {(contactInfo?.email || contactInfo?.phone || (contactInfo?.city && contactInfo?.state)) && (
+          <div style={{ marginBottom: "20px" }}>
+            <h2 style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", opacity: 0.7, marginBottom: "8px" }}>Contact</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+              {contactInfo?.email && <div style={{ fontSize: "9px", opacity: 0.85, wordBreak: "break-all" }}>{contactInfo.email}</div>}
+              {contactInfo?.phone && <div style={{ fontSize: "9px", opacity: 0.85 }}>{contactInfo.phone}</div>}
+              {contactInfo?.city && contactInfo?.state && (
+                <div style={{ fontSize: "9px", opacity: 0.85 }}>{contactInfo.city}, {contactInfo.state}</div>
+              )}
+            </div>
+          </div>
         )}
 
         {data.skills.length > 0 && (
@@ -135,7 +177,7 @@ export function ModernPreview({ data, installerName, accentColor }: ModernPrevie
                     </span>
                   </div>
                   <div style={{ fontSize: "10px", color: "#666" }}>
-                    {wh.company_name} · {wh.city}, {wh.state}
+                    {wh.company_name}{wh.is_self_employed ? " (Self-Employed)" : ""} · {wh.city}, {wh.state}
                   </div>
                   {wh.description && <p style={{ marginTop: "3px", color: "#444", fontSize: "10px", lineHeight: 1.5, margin: "3px 0 0 0" }}>{wh.description}</p>}
                 </div>

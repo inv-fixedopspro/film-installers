@@ -174,6 +174,7 @@ export interface Database {
           installer_profile_id: string;
           selected_template: ResumeTemplate;
           accent_color: ResumeAccentColor;
+          show_photo: boolean;
           headline: string;
           summary: string;
           skills: string[];
@@ -192,6 +193,7 @@ export interface Database {
           installer_profile_id: string;
           selected_template?: ResumeTemplate;
           accent_color?: ResumeAccentColor;
+          show_photo?: boolean;
           headline?: string;
           summary?: string;
           skills?: string[];
@@ -210,6 +212,7 @@ export interface Database {
           installer_profile_id?: string;
           selected_template?: ResumeTemplate;
           accent_color?: ResumeAccentColor;
+          show_photo?: boolean;
           headline?: string;
           summary?: string;
           skills?: string[];

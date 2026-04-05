@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ResumeFormData } from "@/lib/validations/resume";
 import type { ResumeTemplate, ResumeAccentColor } from "@/lib/types/database";
+import type { InstallerContactInfo } from "@/app/(protected)/dashboard/resume/page";
 import { StandardPreview, ModernPreview, MinimalPreview } from "./previews";
 
 const PAGE_WIDTH_PX = 816;
@@ -14,10 +15,11 @@ interface ResumePreviewProps {
   template: ResumeTemplate;
   accentColor: ResumeAccentColor;
   installerName?: string;
+  contactInfo?: InstallerContactInfo;
   className?: string;
 }
 
-export function ResumePreview({ data, template, accentColor, installerName, className }: ResumePreviewProps) {
+export function ResumePreview({ data, template, accentColor, installerName, contactInfo, className }: ResumePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
@@ -54,11 +56,15 @@ export function ResumePreview({ data, template, accentColor, installerName, clas
           overflow: "hidden",
         }}
       >
-        {template === "standard" && <StandardPreview data={data} installerName={installerName} />}
-        {template === "modern" && (
-          <ModernPreview data={data} installerName={installerName} accentColor={accentColor} />
+        {template === "standard" && (
+          <StandardPreview data={data} installerName={installerName} contactInfo={contactInfo} />
         )}
-        {template === "minimal" && <MinimalPreview data={data} installerName={installerName} />}
+        {template === "modern" && (
+          <ModernPreview data={data} installerName={installerName} accentColor={accentColor} contactInfo={contactInfo} />
+        )}
+        {template === "minimal" && (
+          <MinimalPreview data={data} installerName={installerName} contactInfo={contactInfo} />
+        )}
       </div>
     </div>
   );

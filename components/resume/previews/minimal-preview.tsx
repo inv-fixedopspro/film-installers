@@ -1,13 +1,26 @@
 "use client";
 
 import type { ResumeFormData } from "@/lib/validations/resume";
+import type { InstallerContactInfo } from "@/app/(protected)/dashboard/resume/page";
+
+const EXPERIENCE_LEVEL_LABELS: Record<string, string> = {
+  new_to_industry: "New to Industry",
+  experienced: "Experienced Professional",
+};
 
 interface MinimalPreviewProps {
   data: ResumeFormData;
   installerName?: string;
+  contactInfo?: InstallerContactInfo;
 }
 
-export function MinimalPreview({ data, installerName }: MinimalPreviewProps) {
+export function MinimalPreview({ data, installerName, contactInfo }: MinimalPreviewProps) {
+  const showPhoto = data.show_photo && contactInfo?.photoUrl;
+  const contactParts: string[] = [];
+  if (contactInfo?.email) contactParts.push(contactInfo.email);
+  if (contactInfo?.phone) contactParts.push(contactInfo.phone);
+  if (contactInfo?.city && contactInfo?.state) contactParts.push(`${contactInfo.city}, ${contactInfo.state}`);
+
   return (
     <div
       style={{
@@ -23,12 +36,39 @@ export function MinimalPreview({ data, installerName }: MinimalPreviewProps) {
         boxSizing: "border-box",
       }}
     >
-      <div style={{ marginBottom: "28px" }}>
-        <h1 style={{ fontSize: "22px", fontWeight: 300, letterSpacing: "0.04em", color: "#1a1a1a", margin: 0 }}>
-          {installerName || "Your Name"}
-        </h1>
-        {data.headline && (
-          <p style={{ fontSize: "11px", color: "#777", marginTop: "4px", marginBottom: 0 }}>{data.headline}</p>
+      <div style={{ marginBottom: "28px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: "22px", fontWeight: 300, letterSpacing: "0.04em", color: "#1a1a1a", margin: 0 }}>
+            {installerName || "Your Name"}
+          </h1>
+          {data.headline && (
+            <p style={{ fontSize: "11px", color: "#777", marginTop: "4px", marginBottom: 0 }}>{data.headline}</p>
+          )}
+          {contactInfo?.experience_level && (
+            <p style={{ fontSize: "10px", color: "#aaa", marginTop: "2px", marginBottom: 0 }}>
+              {EXPERIENCE_LEVEL_LABELS[contactInfo.experience_level] ?? contactInfo.experience_level}
+            </p>
+          )}
+          {contactParts.length > 0 && (
+            <p style={{ fontSize: "10px", color: "#999", marginTop: "6px", marginBottom: 0 }}>
+              {contactParts.join(" · ")}
+            </p>
+          )}
+        </div>
+        {showPhoto && (
+          <div style={{ marginLeft: "20px", flexShrink: 0 }}>
+            <img
+              src={contactInfo!.photoUrl!}
+              alt=""
+              style={{
+                width: "72px",
+                height: "72px",
+                borderRadius: "4px",
+                objectFit: "cover",
+                border: "1px solid #e8e8e8",
+              }}
+            />
+          </div>
         )}
       </div>
 
@@ -57,7 +97,7 @@ export function MinimalPreview({ data, installerName }: MinimalPreviewProps) {
                 </div>
                 <div>
                   <div style={{ fontWeight: 500 }}>{wh.job_title || "Position"}</div>
-                  <div style={{ color: "#666", fontSize: "10px" }}>{wh.company_name} · {wh.city}, {wh.state}</div>
+                  <div style={{ color: "#666", fontSize: "10px" }}>{wh.company_name}{wh.is_self_employed ? " (Self-Employed)" : ""} · {wh.city}, {wh.state}</div>
                   {wh.description && <p style={{ marginTop: "4px", color: "#555", lineHeight: 1.6, margin: "4px 0 0 0" }}>{wh.description}</p>}
                 </div>
               </div>
