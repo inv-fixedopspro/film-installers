@@ -1,92 +1,156 @@
 "use client";
 
 import type { ResumeFormData } from "@/lib/validations/resume";
+import type { InstallerContactInfo } from "@/app/(protected)/dashboard/resume/page";
+import { SERVICE_TYPES, EXPERIENCE_YEARS } from "@/lib/constants";
+
+const EXPERIENCE_LEVEL_LABELS: Record<string, string> = {
+  new_to_industry: "New to Industry",
+  experienced: "Experienced Professional",
+};
 
 interface MinimalPreviewProps {
   data: ResumeFormData;
   installerName?: string;
+  contactInfo?: InstallerContactInfo;
 }
 
-export function MinimalPreview({ data, installerName }: MinimalPreviewProps) {
+export function MinimalPreview({ data, installerName, contactInfo }: MinimalPreviewProps) {
+  const showPhoto = data.show_photo && contactInfo?.photoUrl;
+  const contactParts: string[] = [];
+  if (contactInfo?.email) contactParts.push(contactInfo.email);
+  if (contactInfo?.phone) contactParts.push(contactInfo.phone);
+  if (contactInfo?.city && contactInfo?.state) contactParts.push(`${contactInfo.city}, ${contactInfo.state}`);
+
   return (
-    <div className="bg-white text-[#1a1a1a] font-sans p-10 min-h-full text-[11px] leading-relaxed">
-      <div className="mb-6">
-        <h1 className="text-[20px] font-light tracking-wide text-[#1a1a1a]">
-          {installerName || "Your Name"}
-        </h1>
-        {data.headline && (
-          <p className="text-[11px] text-[#777] mt-0.5">{data.headline}</p>
+    <div
+      style={{
+        width: "816px",
+        height: "1056px",
+        padding: "72px 80px",
+        backgroundColor: "white",
+        color: "#1a1a1a",
+        fontFamily: "Arial, Helvetica, sans-serif",
+        fontSize: "11px",
+        lineHeight: "1.5",
+        overflow: "hidden",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ marginBottom: "28px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: "22px", fontWeight: 300, letterSpacing: "0.04em", color: "#1a1a1a", margin: 0 }}>
+            {installerName || "Your Name"}
+          </h1>
+          {data.headline && (
+            <p style={{ fontSize: "11px", color: "#777", marginTop: "4px", marginBottom: 0 }}>{data.headline}</p>
+          )}
+          {contactInfo?.experience_level && (
+            <p style={{ fontSize: "10px", color: "#aaa", marginTop: "2px", marginBottom: 0 }}>
+              {EXPERIENCE_LEVEL_LABELS[contactInfo.experience_level] ?? contactInfo.experience_level}
+            </p>
+          )}
+          {contactInfo?.experience_level === "experienced" && contactInfo.installerExperience?.length > 0 && (
+            <p style={{ fontSize: "10px", color: "#bbb", marginTop: "2px", marginBottom: 0 }}>
+              {contactInfo.installerExperience.map((exp) => {
+                const svc = SERVICE_TYPES.find((s) => s.value === exp.service_type)?.label ?? exp.service_type;
+                const yrs = EXPERIENCE_YEARS.find((y) => y.value === exp.years_experience)?.label ?? exp.years_experience;
+                return `${svc}: ${yrs}`;
+              }).join(" · ")}
+            </p>
+          )}
+          {contactParts.length > 0 && (
+            <p style={{ fontSize: "10px", color: "#999", marginTop: "6px", marginBottom: 0 }}>
+              {contactParts.join(" · ")}
+            </p>
+          )}
+        </div>
+        {showPhoto && (
+          <div style={{ marginLeft: "20px", flexShrink: 0 }}>
+            <img
+              src={contactInfo!.photoUrl!}
+              alt=""
+              style={{
+                width: "72px",
+                height: "72px",
+                borderRadius: "4px",
+                objectFit: "cover",
+                border: "1px solid #e8e8e8",
+              }}
+            />
+          </div>
         )}
       </div>
 
       {data.summary && (
-        <section className="mb-5">
-          <div className="border-t border-[#e8e8e8] pt-3">
-            <p className="text-[#444] leading-relaxed">{data.summary}</p>
-          </div>
-        </section>
+        <div style={{ marginBottom: "20px", borderTop: "1px solid #e8e8e8", paddingTop: "14px" }}>
+          <p style={{ color: "#444", lineHeight: 1.7, margin: 0 }}>{data.summary}</p>
+        </div>
       )}
 
       {data.skills.length > 0 && (
-        <section className="mb-5">
-          <h2 className="text-[10px] uppercase tracking-widest text-[#999] mb-2">Skills</h2>
-          <p className="text-[#555]">{data.skills.join(", ")}</p>
-        </section>
+        <div style={{ marginBottom: "20px" }}>
+          <h2 style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", color: "#999", marginBottom: "6px" }}>Skills</h2>
+          <p style={{ color: "#555", margin: 0 }}>{data.skills.join(", ")}</p>
+        </div>
       )}
 
       {data.work_history.length > 0 && (
-        <section className="mb-5">
-          <h2 className="text-[10px] uppercase tracking-widest text-[#999] mb-3">Experience</h2>
-          <div className="space-y-4">
+        <div style={{ marginBottom: "20px" }}>
+          <h2 style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", color: "#999", marginBottom: "12px" }}>Experience</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             {data.work_history.map((wh) => (
-              <div key={wh.id} className="grid grid-cols-[auto_1fr] gap-x-4">
-                <div className="text-[9px] text-[#aaa] pt-0.5 whitespace-nowrap">
+              <div key={wh.id} style={{ display: "grid", gridTemplateColumns: "64px 1fr", gap: "0 16px" }}>
+                <div style={{ fontSize: "9px", color: "#aaa", paddingTop: "2px", lineHeight: 1.4 }}>
                   {wh.start_year}
                   {!wh.is_current && wh.end_year ? `–${wh.end_year}` : wh.is_current ? "–Now" : ""}
                 </div>
                 <div>
-                  <div className="font-medium">{wh.job_title || "Position"}</div>
-                  <div className="text-[#666] text-[10px]">{wh.company_name} · {wh.city}, {wh.state}</div>
-                  {wh.description && <p className="mt-1 text-[#555]">{wh.description}</p>}
+                  <div style={{ fontWeight: 500 }}>{wh.job_title || "Position"}</div>
+                  <div style={{ color: "#666", fontSize: "10px" }}>{wh.company_name}{wh.is_self_employed ? " (Self-Employed)" : ""} · {wh.city}, {wh.state}</div>
+                  {wh.description && <p style={{ marginTop: "4px", color: "#555", lineHeight: 1.6, margin: "4px 0 0 0" }}>{wh.description}</p>}
                 </div>
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
 
       {data.certifications.length > 0 && (
-        <section className="mb-5">
-          <h2 className="text-[10px] uppercase tracking-widest text-[#999] mb-3">Certifications</h2>
-          <div className="space-y-1.5">
+        <div style={{ marginBottom: "20px" }}>
+          <h2 style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", color: "#999", marginBottom: "12px" }}>Certifications</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
             {data.certifications.map((cert) => (
-              <div key={cert.id} className="flex justify-between">
-                <span>{cert.name} <span className="text-[#888]">— {cert.issuing_org}</span></span>
-                <span className="text-[#aaa] text-[10px]">{cert.issue_year}</span>
+              <div key={cert.id} style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>
+                  {cert.name}{" "}
+                  <span style={{ color: "#888" }}>— {cert.issuing_org}</span>
+                </span>
+                <span style={{ color: "#aaa", fontSize: "10px" }}>{cert.issue_year}</span>
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
 
       {data.education.length > 0 && (
-        <section>
-          <h2 className="text-[10px] uppercase tracking-widest text-[#999] mb-3">Education</h2>
-          <div className="space-y-2">
+        <div>
+          <h2 style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", color: "#999", marginBottom: "12px" }}>Education</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {data.education.map((edu) => (
-              <div key={edu.id} className="flex justify-between">
+              <div key={edu.id} style={{ display: "flex", justifyContent: "space-between" }}>
                 <div>
-                  <span className="font-medium">{edu.degree}</span>
-                  {edu.field_of_study && <span className="text-[#666]">, {edu.field_of_study}</span>}
-                  <div className="text-[#888]">{edu.institution}</div>
+                  <span style={{ fontWeight: 500 }}>{edu.degree}</span>
+                  {edu.field_of_study && <span style={{ color: "#666" }}>, {edu.field_of_study}</span>}
+                  <div style={{ color: "#888" }}>{edu.institution}</div>
                 </div>
-                <span className="text-[#aaa] text-[10px]">
+                <span style={{ color: "#aaa", fontSize: "10px" }}>
                   {edu.in_progress ? "In Progress" : edu.graduation_year || ""}
                 </span>
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
     </div>
   );

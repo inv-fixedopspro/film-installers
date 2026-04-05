@@ -13,6 +13,7 @@ export async function upsertResume(
     installer_profile_id: data.installer_profile_id,
     selected_template: data.selected_template,
     accent_color: data.accent_color,
+    show_photo: data.show_photo,
     headline: data.headline,
     summary: data.summary,
     skills: data.skills,

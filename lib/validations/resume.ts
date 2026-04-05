@@ -97,6 +97,7 @@ export const resumeSchema = z.object({
   accent_color: z.enum(["charcoal", "navy", "forest"], {
     errorMap: () => ({ message: "Invalid accent color" }),
   }),
+  show_photo: z.boolean(),
   headline: z.string().max(120, "Headline must be 120 characters or less"),
   summary: z.string().max(2000, "Summary must be 2000 characters or less"),
   skills: z

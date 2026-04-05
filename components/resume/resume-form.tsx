@@ -8,8 +8,10 @@ import { Save } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { FormField, LoadingButton, SectionHeader } from "@/components/shared";
+import { FormField, LoadingButton, SectionHeader, AlertMessage } from "@/components/shared";
 import { TemplateSelector } from "./template-selector";
 import { SkillsInput } from "./skills-input";
 import { WorkHistoryFields } from "./work-history-fields";
@@ -19,14 +21,21 @@ import { ResumePreview } from "./resume-preview";
 import { resumeSchema, type ResumeFormData } from "@/lib/validations/resume";
 import { useApiMutation } from "@/hooks/use-api-mutation";
 import type { InstallerResume } from "@/lib/types/database";
+import type { InstallerContactInfo } from "@/app/(protected)/dashboard/resume/page";
+
+const EXPERIENCE_LEVEL_LABELS: Record<string, string> = {
+  new_to_industry: "New to Industry",
+  experienced: "Experienced Professional",
+};
 
 interface ResumeFormProps {
   installerProfileId: string;
   installerName: string;
   existingResume: InstallerResume | null;
+  contactInfo: InstallerContactInfo;
 }
 
-export function ResumeForm({ installerProfileId, installerName, existingResume }: ResumeFormProps) {
+export function ResumeForm({ installerProfileId, installerName, existingResume, contactInfo }: ResumeFormProps) {
   const [previewData, setPreviewData] = useState<ResumeFormData | null>(null);
 
   const defaultValues: ResumeFormData = existingResume
@@ -34,6 +43,7 @@ export function ResumeForm({ installerProfileId, installerName, existingResume }
         installer_profile_id: existingResume.installer_profile_id,
         selected_template: existingResume.selected_template,
         accent_color: existingResume.accent_color,
+        show_photo: existingResume.show_photo ?? true,
         headline: existingResume.headline,
         summary: existingResume.summary,
         skills: existingResume.skills,
@@ -45,6 +55,7 @@ export function ResumeForm({ installerProfileId, installerName, existingResume }
         installer_profile_id: installerProfileId,
         selected_template: "standard",
         accent_color: "navy",
+        show_photo: true,
         headline: "",
         summary: "",
         skills: [],
@@ -67,6 +78,7 @@ export function ResumeForm({ installerProfileId, installerName, existingResume }
 
   const watchedTemplate = watch("selected_template");
   const watchedAccentColor = watch("accent_color");
+  const watchedShowPhoto = watch("show_photo");
 
   const { mutate: saveResume, isLoading: isSaving } = useApiMutation<
     ResumeFormData & { id?: string },
@@ -153,7 +165,82 @@ export function ResumeForm({ installerProfileId, installerName, existingResume }
                         />
                       )}
                     />
+                  </AccordionContent>
+                </AccordionItem>
 
+                <AccordionItem value="contact" className="border border-border rounded-lg px-4">
+                  <AccordionTrigger className="text-sm font-semibold hover:no-underline py-3">
+                    Contact Info
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-1 pb-4 space-y-4">
+                    <AlertMessage variant="info" showIcon className="text-xs">
+                      Contact info is pulled from your installer profile. To update it, edit your{" "}
+                      <a href="/dashboard/installer" className="underline underline-offset-2 hover:opacity-80 transition-opacity">
+                        installer profile
+                      </a>
+                      .
+                    </AlertMessage>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Email</Label>
+                        <div className="text-sm px-3 py-2 rounded-md bg-muted/30 border border-border text-foreground">
+                          {contactInfo.email || "—"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Phone</Label>
+                        <div className="text-sm px-3 py-2 rounded-md bg-muted/30 border border-border text-foreground">
+                          {contactInfo.phone || "—"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Location</Label>
+                        <div className="text-sm px-3 py-2 rounded-md bg-muted/30 border border-border text-foreground">
+                          {contactInfo.city && contactInfo.state
+                            ? `${contactInfo.city}, ${contactInfo.state}`
+                            : "—"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Experience Level</Label>
+                        <div className="text-sm px-3 py-2 rounded-md bg-muted/30 border border-border text-foreground">
+                          {EXPERIENCE_LEVEL_LABELS[contactInfo.experience_level] ?? contactInfo.experience_level}
+                        </div>
+                      </div>
+                    </div>
+
+                    {contactInfo.hasPhoto && (
+                      <Controller
+                        name="show_photo"
+                        control={control}
+                        render={({ field }) => (
+                          <div className="flex items-center justify-between py-3 px-4 rounded-md border border-border bg-muted/20">
+                            <div>
+                              <p className="text-sm font-medium">Show Profile Photo</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Display your profile photo in the resume header
+                              </p>
+                            </div>
+                            <Switch
+                              id="show_photo"
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </div>
+                        )}
+                      />
+                    )}
+
+                    {!contactInfo.hasPhoto && (
+                      <p className="text-xs text-muted-foreground">
+                        No profile photo uploaded yet. Add one from your{" "}
+                        <a href="/dashboard/installer" className="underline underline-offset-2 hover:text-foreground transition-colors">
+                          installer profile
+                        </a>{" "}
+                        to enable the photo option.
+                      </p>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
 
@@ -269,23 +356,27 @@ export function ResumeForm({ installerProfileId, installerName, existingResume }
             </form>
           </div>
 
-          <div className="lg:w-[420px] lg:shrink-0">
+          <div className="lg:w-[460px] lg:shrink-0">
             <div className="lg:sticky lg:top-6">
               <SectionHeader title="Live Preview" className="mb-3" />
-              <div className="overflow-y-auto max-h-[80vh] rounded-lg">
-                {previewData ? (
-                  <ResumePreview
-                    data={previewData}
-                    template={watchedTemplate}
-                    accentColor={watchedAccentColor}
-                    installerName={installerName}
-                  />
-                ) : (
-                  <div className="bg-muted rounded-lg h-[500px] flex items-center justify-center">
+              {previewData ? (
+                <ResumePreview
+                  data={previewData}
+                  template={watchedTemplate}
+                  accentColor={watchedAccentColor}
+                  installerName={installerName}
+                  contactInfo={contactInfo}
+                />
+              ) : (
+                <div
+                  className="bg-muted rounded-md border border-border"
+                  style={{ aspectRatio: "816 / 1056" }}
+                >
+                  <div className="flex items-center justify-center h-full">
                     <p className="text-muted-foreground text-sm">Preview loading…</p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground text-center mt-2">
                 Updates as you type
               </p>
