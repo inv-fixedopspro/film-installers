@@ -4,14 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Save, Info } from "lucide-react";
+import { Save } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { FormField, LoadingButton, SectionHeader } from "@/components/shared";
+import { FormField, LoadingButton, SectionHeader, AlertMessage } from "@/components/shared";
 import { TemplateSelector } from "./template-selector";
 import { SkillsInput } from "./skills-input";
 import { WorkHistoryFields } from "./work-history-fields";
@@ -173,16 +173,13 @@ export function ResumeForm({ installerProfileId, installerName, existingResume, 
                     Contact Info
                   </AccordionTrigger>
                   <AccordionContent className="pt-1 pb-4 space-y-4">
-                    <div className="flex items-start gap-2 p-3 rounded-md bg-muted/50 border border-border">
-                      <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                      <p className="text-xs text-muted-foreground">
-                        Contact info is pulled from your installer profile. To update it, edit your{" "}
-                        <a href="/dashboard/installer" className="underline underline-offset-2 hover:text-foreground transition-colors">
-                          installer profile
-                        </a>
-                        .
-                      </p>
-                    </div>
+                    <AlertMessage variant="info" showIcon className="text-xs">
+                      Contact info is pulled from your installer profile. To update it, edit your{" "}
+                      <a href="/dashboard/installer" className="underline underline-offset-2 hover:opacity-80 transition-opacity">
+                        installer profile
+                      </a>
+                      .
+                    </AlertMessage>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">

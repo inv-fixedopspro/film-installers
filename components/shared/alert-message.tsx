@@ -1,11 +1,13 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { AlertCircle, CheckCircle, AlertTriangle, Info } from "lucide-react";
+import { CircleAlert as AlertCircle, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info } from "lucide-react";
 
 export type AlertVariant = "error" | "success" | "warning" | "info";
 
 interface AlertMessageProps {
   variant: AlertVariant;
-  message: string;
+  message?: string;
+  children?: ReactNode;
   className?: string;
   showIcon?: boolean;
 }
@@ -36,19 +38,20 @@ const variantIcons: Record<AlertVariant, typeof AlertCircle> = {
   info: Info,
 };
 
-export function AlertMessage({ variant, message, className, showIcon = false }: AlertMessageProps) {
+export function AlertMessage({ variant, message, children, className, showIcon = false }: AlertMessageProps) {
   const styles = variantStyles[variant];
   const Icon = variantIcons[variant];
+  const content = children ?? message;
 
   return (
     <div className={cn("p-3 rounded-lg text-sm", styles.container, className)}>
       {showIcon ? (
         <div className="flex items-start gap-2">
           <Icon className={cn("h-4 w-4 mt-0.5 flex-shrink-0", styles.icon)} />
-          <span>{message}</span>
+          <div>{content}</div>
         </div>
       ) : (
-        message
+        content
       )}
     </div>
   );

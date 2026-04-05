@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getResumeByInstallerId } from "@/lib/db/resume";
 import { getSignedUrl } from "@/lib/storage/company-assets";
 import { ResumeForm } from "@/components/resume";
-import { BackLink } from "@/components/shared";
+import { BackLink, PageHeader } from "@/components/shared";
 import type { ExperienceLevel, ServiceType, ExperienceYears } from "@/lib/types/database";
 
 export const metadata = { title: "Resume Builder" };
@@ -75,12 +75,10 @@ export default async function ResumePage() {
     <div className="max-w-7xl mx-auto space-y-6">
       <div>
         <BackLink href="/dashboard/installer" label="Back to Dashboard" className="mb-4" />
-        <div>
-          <h1 className="text-2xl font-bold">Resume Builder</h1>
-          <p className="text-muted-foreground mt-1">
-            Build your professional resume and share it with potential employers
-          </p>
-        </div>
+        <PageHeader
+          title="Resume Builder"
+          description="Build your professional resume and share it with potential employers"
+        />
       </div>
 
       <ResumeForm
