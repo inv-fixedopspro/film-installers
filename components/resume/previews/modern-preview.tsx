@@ -165,34 +165,34 @@ export function ModernPreview({ data, installerName, accentColor, contactInfo }:
       <div
         style={{
           flex: 1,
-          padding: "48px 40px",
+          padding: "56px 48px",
           boxSizing: "border-box",
           overflow: "hidden",
         }}
       >
         {data.summary && (
-          <div style={{ marginBottom: "20px" }}>
-            <h2 style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#555", marginBottom: "6px" }}>Profile</h2>
-            <p style={{ color: "#333", lineHeight: 1.6, margin: 0 }}>{data.summary}</p>
+          <div style={{ marginBottom: "32px" }}>
+            <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: accent, marginBottom: "14px", borderBottom: `2px solid ${accent}`, paddingBottom: "8px" }}>Profile</h2>
+            <p style={{ color: "#333", lineHeight: 1.8, margin: 0, fontSize: "13px" }}>{data.summary}</p>
           </div>
         )}
 
         {data.work_history.length > 0 && (
           <div>
-            <h2 style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#555", marginBottom: "10px" }}>Experience</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <h2 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: accent, marginBottom: "18px", borderBottom: `2px solid ${accent}`, paddingBottom: "8px" }}>Experience</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               {data.work_history.map((wh) => (
-                <div key={wh.id}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <span style={{ fontWeight: 600, fontSize: "11px" }}>{wh.job_title || "Position"}</span>
-                    <span style={{ fontSize: "9px", color: "#888" }}>
+                <div key={wh.id} style={{ paddingBottom: "16px", borderBottom: "1px solid #e5e5e5" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "14px", color: "#1a1a1a" }}>{wh.job_title || "Position"}</span>
+                    <span style={{ fontSize: "11px", color: "#666", fontWeight: 500 }}>
                       {formatDateRange(wh.start_month, wh.start_year, wh.end_month, wh.end_year, wh.is_current)}
                     </span>
                   </div>
-                  <div style={{ fontSize: "10px", color: "#666" }}>
+                  <div style={{ fontSize: "12px", color: "#555", marginBottom: "8px", fontWeight: 500 }}>
                     {wh.company_name}{wh.is_self_employed ? " (Self-Employed)" : ""} · {wh.city}, {wh.state}
                   </div>
-                  {wh.description && <p style={{ marginTop: "3px", color: "#444", fontSize: "10px", lineHeight: 1.5, margin: "3px 0 0 0" }}>{wh.description}</p>}
+                  {wh.description && <p style={{ color: "#444", fontSize: "12px", lineHeight: 1.7, margin: 0 }}>{wh.description}</p>}
                 </div>
               ))}
             </div>
