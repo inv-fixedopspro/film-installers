@@ -269,23 +269,26 @@ export function ResumeForm({ installerProfileId, installerName, existingResume }
             </form>
           </div>
 
-          <div className="lg:w-[420px] lg:shrink-0">
+          <div className="lg:w-[460px] lg:shrink-0">
             <div className="lg:sticky lg:top-6">
               <SectionHeader title="Live Preview" className="mb-3" />
-              <div className="overflow-y-auto max-h-[80vh] rounded-lg">
-                {previewData ? (
-                  <ResumePreview
-                    data={previewData}
-                    template={watchedTemplate}
-                    accentColor={watchedAccentColor}
-                    installerName={installerName}
-                  />
-                ) : (
-                  <div className="bg-muted rounded-lg h-[500px] flex items-center justify-center">
+              {previewData ? (
+                <ResumePreview
+                  data={previewData}
+                  template={watchedTemplate}
+                  accentColor={watchedAccentColor}
+                  installerName={installerName}
+                />
+              ) : (
+                <div
+                  className="bg-muted rounded-md border border-border"
+                  style={{ aspectRatio: "816 / 1056" }}
+                >
+                  <div className="flex items-center justify-center h-full">
                     <p className="text-muted-foreground text-sm">Preview loading…</p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground text-center mt-2">
                 Updates as you type
               </p>

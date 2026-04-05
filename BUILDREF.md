@@ -912,7 +912,7 @@ This rule applies to any extension-provided function: `extensions.gen_random_byt
 | Moderation banner | Shared component | Self-contained, used in dashboard layouts |
 | Banned page | `/banned` | |
 | Restricted page | `/restricted` | |
-| Resume builder | `/dashboard/resume`, `/api/resume` | 3 templates (Standard, Modern, Minimal), live HTML preview |
+| Resume builder | `/dashboard/resume`, `/api/resume` | 3 templates (Standard, Modern, Minimal), live preview rendered as fixed 8.5×11 letter-page (816×1056px canvas scaled to sidebar width via CSS transform — proportions match printed output exactly) |
 
 ### Scaffolded (Coming Soon UI)
 

@@ -21,89 +21,101 @@ interface StandardPreviewProps {
 
 export function StandardPreview({ data, installerName }: StandardPreviewProps) {
   return (
-    <div className="bg-white text-[#1a1a1a] font-sans p-8 min-h-full text-[11px] leading-relaxed">
-      <div className="border-b-2 border-[#1a1a1a] pb-4 mb-5">
-        <h1 className="text-[22px] font-bold leading-tight tracking-tight">
+    <div
+      className="bg-white text-[#1a1a1a] font-sans"
+      style={{
+        width: "816px",
+        height: "1056px",
+        padding: "64px 72px",
+        fontSize: "11px",
+        lineHeight: "1.5",
+        fontFamily: "Arial, Helvetica, sans-serif",
+        overflow: "hidden",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ borderBottom: "2px solid #1a1a1a", paddingBottom: "16px", marginBottom: "20px" }}>
+        <h1 style={{ fontSize: "24px", fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.02em", margin: 0 }}>
           {installerName || "Your Name"}
         </h1>
         {data.headline && (
-          <p className="text-[12px] text-[#555] mt-1">{data.headline}</p>
+          <p style={{ fontSize: "13px", color: "#555", marginTop: "4px", marginBottom: 0 }}>{data.headline}</p>
         )}
       </div>
 
       {data.summary && (
-        <section className="mb-5">
-          <h2 className="text-[12px] font-bold uppercase tracking-wider mb-2 text-[#1a1a1a]">Summary</h2>
-          <p className="text-[#333] leading-relaxed">{data.summary}</p>
-        </section>
+        <div style={{ marginBottom: "18px" }}>
+          <h2 style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px", color: "#1a1a1a" }}>Summary</h2>
+          <p style={{ color: "#333", lineHeight: 1.6, margin: 0 }}>{data.summary}</p>
+        </div>
       )}
 
       {data.skills.length > 0 && (
-        <section className="mb-5">
-          <h2 className="text-[12px] font-bold uppercase tracking-wider mb-2 text-[#1a1a1a]">Skills</h2>
-          <p className="text-[#333]">{data.skills.join(" · ")}</p>
-        </section>
+        <div style={{ marginBottom: "18px" }}>
+          <h2 style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px", color: "#1a1a1a" }}>Skills</h2>
+          <p style={{ color: "#333", margin: 0 }}>{data.skills.join(" · ")}</p>
+        </div>
       )}
 
       {data.work_history.length > 0 && (
-        <section className="mb-5">
-          <h2 className="text-[12px] font-bold uppercase tracking-wider mb-3 text-[#1a1a1a]">Work History</h2>
-          <div className="space-y-4">
+        <div style={{ marginBottom: "18px" }}>
+          <h2 style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "10px", color: "#1a1a1a" }}>Work History</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             {data.work_history.map((wh) => (
               <div key={wh.id}>
-                <div className="flex justify-between items-baseline">
-                  <span className="font-semibold text-[12px]">{wh.job_title || "Position"}</span>
-                  <span className="text-[#777] text-[10px]">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontWeight: 600, fontSize: "12px" }}>{wh.job_title || "Position"}</span>
+                  <span style={{ color: "#777", fontSize: "10px" }}>
                     {formatDateRange(wh.start_month, wh.start_year, wh.end_month, wh.end_year, wh.is_current)}
                   </span>
                 </div>
-                <div className="text-[#555] text-[11px]">
+                <div style={{ color: "#555", fontSize: "11px" }}>
                   {wh.company_name}{wh.is_self_employed ? " (Self-employed)" : ""} · {wh.city}, {wh.state}
                 </div>
-                {wh.description && <p className="mt-1 text-[#444]">{wh.description}</p>}
+                {wh.description && <p style={{ marginTop: "4px", color: "#444", margin: "4px 0 0 0" }}>{wh.description}</p>}
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
 
       {data.certifications.length > 0 && (
-        <section className="mb-5">
-          <h2 className="text-[12px] font-bold uppercase tracking-wider mb-3 text-[#1a1a1a]">Certifications</h2>
-          <div className="space-y-2">
+        <div style={{ marginBottom: "18px" }}>
+          <h2 style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "10px", color: "#1a1a1a" }}>Certifications</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {data.certifications.map((cert) => (
-              <div key={cert.id} className="flex justify-between items-baseline">
+              <div key={cert.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div>
-                  <span className="font-medium">{cert.name}</span>
-                  <span className="text-[#666] ml-1">— {cert.issuing_org}</span>
+                  <span style={{ fontWeight: 500 }}>{cert.name}</span>
+                  <span style={{ color: "#666", marginLeft: "4px" }}>— {cert.issuing_org}</span>
                 </div>
-                <span className="text-[#777] text-[10px]">
+                <span style={{ color: "#777", fontSize: "10px" }}>
                   {cert.issue_year}{cert.no_expiry ? " · No Expiry" : cert.expiry_year ? ` – ${cert.expiry_year}` : ""}
                 </span>
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
 
       {data.education.length > 0 && (
-        <section>
-          <h2 className="text-[12px] font-bold uppercase tracking-wider mb-3 text-[#1a1a1a]">Education</h2>
-          <div className="space-y-2">
+        <div>
+          <h2 style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "10px", color: "#1a1a1a" }}>Education</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {data.education.map((edu) => (
-              <div key={edu.id} className="flex justify-between items-baseline">
+              <div key={edu.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <div>
-                  <span className="font-medium">{edu.degree}</span>
-                  {edu.field_of_study && <span className="text-[#555]">, {edu.field_of_study}</span>}
-                  <div className="text-[#666]">{edu.institution}</div>
+                  <span style={{ fontWeight: 500 }}>{edu.degree}</span>
+                  {edu.field_of_study && <span style={{ color: "#555" }}>, {edu.field_of_study}</span>}
+                  <div style={{ color: "#666" }}>{edu.institution}</div>
                 </div>
-                <span className="text-[#777] text-[10px]">
+                <span style={{ color: "#777", fontSize: "10px" }}>
                   {edu.in_progress ? "In Progress" : edu.graduation_year || ""}
                 </span>
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
     </div>
   );
