@@ -14,13 +14,14 @@ This document is the authoritative behavioral and architectural contract for the
 6. [Auth System](#6-auth-system)
 7. [Moderation System](#7-moderation-system)
 8. [Data Privacy and Consent Rules](#8-data-privacy-and-consent-rules)
-9. [Component Contracts](#9-component-contracts)
-10. [API Route Patterns](#10-api-route-patterns)
-11. [Error Handling System](#11-error-handling-system)
-12. [Design System](#12-design-system)
-13. [Database Schema Quick Reference](#13-database-schema-quick-reference)
-14. [Feature Status Map](#14-feature-status-map)
-15. [File and Folder Conventions](#15-file-and-folder-conventions)
+9. [Advertising System](#9-advertising-system)
+10. [Component Contracts](#10-component-contracts)
+11. [API Route Patterns](#11-api-route-patterns)
+12. [Error Handling System](#12-error-handling-system)
+13. [Design System](#13-design-system)
+14. [Database Schema Quick Reference](#14-database-schema-quick-reference)
+15. [Feature Status Map](#15-feature-status-map)
+16. [File and Folder Conventions](#16-file-and-folder-conventions)
 
 ---
 
@@ -480,11 +481,289 @@ The platform is live for EU and UK users. The following additional rules apply:
 
 ---
 
-## 9. Component Contracts
+## 9. Advertising System
+
+### Overview and Design Philosophy
+
+Film Installers operates a **first-party, admin-managed advertising system**. There is no self-service advertiser portal. All advertiser onboarding, campaign creation, creative uploads, slot assignments, and billing are handled by platform admins through the `/admin/ad-space` interface.
+
+Key design principles:
+- **Admin-only management:** Every write operation flows through `createAdminRoute()`. Advertisers never log in.
+- **Invoice-based billing:** No payment gateway integration. Admins record `payment_status` (unpaid/invoiced/paid/refunded) and `invoice_reference` manually.
+- **Privacy-first tracking:** Anonymous session tokens only. No PII in analytics tables. CCPA opt-out respected at both client and server.
+- **Static creatives only:** JPEG, PNG, WebP, and GIF. No video, no JavaScript, no iframes. Max 2 MB per file.
+- **Graceful degradation:** The `AdSlot` component renders nothing when no ads are available — zero layout shift, zero empty boxes.
+
+### Database Tables and Relationships
+
+```
+advertiser ──1:N──> ad_campaigns ──1:N──> ad_creatives
+                         │
+                         ├──N:1──> ad_packages
+                         │
+                         └──N:M──> ad_slots (via ad_campaign_slots)
+
+ad_impressions ←── recorded by AdSlot component per rotation
+ad_clicks      ←── recorded by /api/ads/click/[creativeId] redirect
+ad_consent_log ←── records CCPA opt-out/in events from settings
+```
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `advertisers` | Companies/people buying ad space | `name`, `contact_email`, `contact_phone`, `company_url`, `notes`, `is_active` |
+| `ad_packages` | Purchasable advertising tiers defining what a campaign includes | `name`, `tier`, `price_cents`, `duration_days`, `max_creatives`, `included_slot_types`, `included_page_contexts`, `target_audience`, `rotation_interval_seconds`, `priority_weight`, `is_active` |
+| `ad_slots` | Physical ad placements on specific pages | `slot_key` (unique), `display_name`, `slot_type`, `page_context`, `width_px`, `height_px`, `max_file_size_kb`, `allowed_formats`, `is_public_page`, `traffic_tier`, `target_audience`, `sort_order`, `is_active` |
+| `ad_campaigns` | Sold advertising engagements linking an advertiser to a package | `advertiser_id`, `ad_package_id`, `campaign_name`, `status`, `starts_at`, `ends_at`, `total_price_cents`, `payment_status`, `invoice_reference`, `paid_at`, `admin_notes`, `created_by` |
+| `ad_creatives` | Image files uploaded for a campaign, each targeting a specific slot type | `campaign_id`, `label`, `image_storage_path`, `destination_url`, `alt_text`, `slot_type`, `width_px`, `height_px`, `file_size_bytes`, `is_active` |
+| `ad_campaign_slots` | Junction table linking campaigns to the slots they occupy | `campaign_id`, `ad_slot_id`, `is_active` |
+| `ad_impressions` | Anonymized ad render events (pre-existing compliance table, extended with campaign/creative FKs) | `ad_campaign_id`, `ad_creative_id`, `ad_package_id`, `session_token`, `page_context`, `ad_slot`, `rendered_at` |
+| `ad_clicks` | Anonymized click tracking (pre-existing compliance table, extended with campaign/creative FKs) | `ad_campaign_id`, `ad_creative_id`, `ad_package_id`, `impression_id`, `session_token`, `page_context`, `clicked_at` |
+| `ad_consent_log` | CCPA opt-out/in audit trail | `user_id`, `opted_out`, `source` (`settings`, `cookie_banner`, `registration`), `created_at` |
+
+**RLS:** All 6 core ad tables (`advertisers`, `ad_packages`, `ad_slots`, `ad_campaigns`, `ad_creatives`, `ad_campaign_slots`) have RLS enabled with service-role-only access. The 3 pre-existing compliance tables (`ad_impressions`, `ad_clicks`, `ad_consent_log`) retain their original RLS policies.
+
+### Enum Values
+
+All ad system type constraints are enforced via Postgres CHECK constraints (not pg enums) and mirrored as TypeScript types in `lib/types/database.ts`:
+
+```typescript
+AdPackageTier:     "starter" | "professional" | "premium" | "elite"
+AdSlotType:        "leaderboard" | "banner" | "sidebar" | "inline" | "sticky_footer"
+AdPageContext:     "home" | "jobs" | "forum" | "network" | "marketplace" | "blog" | "shop" | "dashboard"
+AdTargetAudience:  "all" | "installer" | "employer"
+AdTrafficTier:     "high" | "medium" | "low"
+AdCampaignStatus:  "draft" | "scheduled" | "active" | "paused" | "completed" | "cancelled"
+AdPaymentStatus:   "unpaid" | "invoiced" | "paid" | "refunded"
+```
+
+Duration options (stored as integer `duration_days`, not an enum): `7` | `14` | `30` | `90`
+
+### Slot Type Dimension Reference
+
+| Slot Type | Desktop (WxH) | Mobile (WxH) | Notes |
+|-----------|---------------|--------------|-------|
+| `leaderboard` | 728 x 90 | — | Full-width header placement |
+| `banner` | 468 x 60 | — | Mid-content placement |
+| `sidebar` | 300 x 250 | — | Right-rail rectangle |
+| `inline` | 728 x 90 | 320 x 100 | Between content sections |
+| `sticky_footer` | 728 x 90 | 320 x 50 | Fixed bottom bar |
+
+Dimensions are defined in `lib/constants/ad-system.ts` as `AD_SLOT_DIMENSIONS`. The `AdSlot` component renders separate `<img>` elements for desktop and mobile when mobile dimensions exist, using `hidden sm:block` / `block sm:hidden` breakpoints.
+
+### Page Context Reference
+
+| Context | Page | Public? | Auth Required? | Traffic Tier |
+|---------|------|---------|---------------|-------------|
+| `home` | `/` | Yes | No | High |
+| `jobs` | `/jobs` | No | Yes | High |
+| `forum` | `/forum` | No | Yes | Medium |
+| `network` | `/network` | No | Yes | Medium |
+| `marketplace` | `/marketplace` | No | Yes | Medium |
+| `blog` | `/blog` | Yes | No | Medium |
+| `shop` | `/shop` | Yes | No | Low |
+| `dashboard` | `/dashboard/**` | No | Yes | High |
+
+Defined in `lib/constants/ad-system.ts` as `AD_PAGE_CONTEXTS`. The `is_public_page` boolean and `traffic_tier` are stored on each `ad_slots` row and also referenced in package configuration.
+
+### Target Audience Targeting Rules
+
+| Audience | Who Sees It | Matching Logic |
+|----------|------------|---------------|
+| `all` | Every visitor regardless of profile type | Always matches |
+| `installer` | Users with `active_profile_type === "installer"` | Package `target_audience` must be `"all"` or `"installer"` |
+| `employer` | Users with `active_profile_type === "employer"` | Package `target_audience` must be `"all"` or `"employer"` |
+
+Both `ad_packages.target_audience` and `ad_slots.target_audience` carry this field. During ad serving (`lib/db/ad-serving.ts`), packages are filtered first — a package with `target_audience = "installer"` will not serve to an employer viewer. The `AdSlot` component passes `targetAudience` as a query parameter to the serve endpoint.
+
+### Ad Rotation Behavior
+
+- **Default interval:** 4 seconds (`AD_ROTATION_INTERVAL_MS = 4000` in `lib/constants/ad-system.ts`)
+- **Per-package override:** Each `ad_packages` row has `rotation_interval_seconds` which the serve endpoint returns per creative
+- **Rotation logic:** The `AdSlot` component cycles through all returned creatives using `setInterval`. Each rotation increments `currentIndex`, wrapping around via modulo.
+- **Impression recording:** A new impression event is fired on every rotation (when `imageReady` becomes true for the new creative), not just the initial load
+- **Single ad:** When only one creative is returned, no rotation timer is started
+- **Priority sorting:** Creatives are sorted by `priority_weight` (descending) from the package tier before being sent to the client
+
+### Click Tracking Flow
+
+**When tracking is allowed** (user has consented to advertising cookies):
+1. Click goes to `/api/ads/click/[creativeId]?st={sessionToken}&ctx={pageContext}&imp={impressionId}`
+2. The endpoint looks up the creative's `destination_url` and `campaign_id`
+3. Inserts a row into `ad_clicks` with `ad_creative_id`, `ad_campaign_id`, `ad_package_id`, `session_token`, `page_context`, `impression_id`
+4. Returns a `302` redirect to the `destination_url`
+5. On error, falls back to redirecting to `/`
+
+**When tracking is NOT allowed** (no advertising cookie consent):
+1. Click href is set directly to `ad.destination_url`
+2. Opens in `_blank` with `rel="noopener noreferrer sponsored"`
+3. No click event is recorded
+
+### Session Token Management
+
+- **Cookie name:** `ad_session_token`
+- **Generated client-side** via `crypto.randomUUID()` in `lib/utils/ad-session.ts`
+- **TTL:** 24 hours, `SameSite=Lax`, no `Secure` flag (works on HTTP dev)
+- **SSR fallback:** Returns the string `"ssr"` during server-side rendering (never recorded)
+- **No server-side validation:** The token is purely a client-side anonymous identifier for session-level deduplication in analytics
+- **No PII linkage:** Session tokens are never joined to `profiles` or `auth.users`
+
+### CCPA Compliance Rules
+
+- `profiles.targeted_ads_opted_out` (boolean) is the master opt-out flag
+- `ad_consent_log` records every opt-in/opt-out event with `source` (`settings` | `cookie_banner` | `registration`)
+- **Client-side check:** `isAdTrackingAllowed()` in `lib/utils/ad-session.ts` reads `localStorage.cookie_consent.advertising`
+- **Server-side check:** The impression endpoint checks `profiles.targeted_ads_opted_out` for authenticated users; if true, returns `{ recorded: false, reason: "opted_out" }` without writing
+- **Ads still display when opted out** — they are first-party content, not third-party trackers. Only impression and click tracking is suppressed.
+- **No PII in tracking tables:** `ad_impressions` and `ad_clicks` contain only `session_token` (anonymous UUID) — no `user_id`, no IP addresses, no device fingerprints
+- **User controls:** The advertising preferences section in `/dashboard/settings` (`components/settings/advertising-preferences-section.tsx`) shows current opt-out status and consent history
+
+### Storage Bucket: ad-creatives
+
+| Property | Value |
+|----------|-------|
+| Bucket name | `ad-creatives` |
+| Visibility | Private |
+| Max file size | 2 MB (2,097,152 bytes) |
+| Allowed MIME types | `image/jpeg`, `image/png`, `image/webp`, `image/gif` |
+| Path structure | `/{campaign_id}/{creative_id}/{sanitized-filename-timestamp.ext}` |
+| RLS | Service role only — all 4 operations restricted to admin/service key |
+
+Storage utilities live in `lib/storage/ad-creatives.ts`:
+
+| Function | Purpose |
+|----------|---------|
+| `uploadAdCreative(campaignId, creativeId, filename, file, contentType)` | Upload with upsert |
+| `replaceAdCreative(campaignId, creativeId, filename, file, contentType)` | Delete folder then upload |
+| `deleteAdCreative(storagePath)` | Remove a single file |
+| `deleteAdCreativeFolder(campaignId, creativeId)` | Remove all files for a creative |
+| `deleteCampaignCreatives(campaignId)` | Remove all creatives for a campaign |
+| `getAdCreativeSignedUrl(storagePath, ttlSeconds?)` | Generate signed URL (default 1 hour) |
+| `getAdCreativeSignedUrls(paths[], ttlSeconds?)` | Batch signed URL generation |
+| `buildAdCreativeStoragePath(campaignId, creativeId, originalFilename)` | Generate sanitized, timestamped path |
+
+### Advertising API Route Inventory
+
+#### Public Ad Routes
+
+| Route | Methods | Auth | Purpose |
+|-------|---------|------|---------|
+| `/api/ads/serve` | GET | None | Returns active creatives for a slot with signed image URLs. Query params: `slot`, `page`, `audience` |
+| `/api/ads/impression` | POST | None | Records an impression event. Checks CCPA opt-out server-side for authenticated users |
+| `/api/ads/click/[creativeId]` | GET | None | Records click and 302 redirects to destination URL. Query params: `st`, `ctx`, `imp` |
+
+#### Admin Advertising Routes
+
+| Route | Methods | Auth | Schema | Purpose |
+|-------|---------|------|--------|---------|
+| `/api/admin/advertising/advertisers` | GET, POST | Admin | `createAdvertiserSchema` | List all / create advertiser |
+| `/api/admin/advertising/advertisers/[id]` | GET, PUT | Admin | `updateAdvertiserSchema` | Get / update single advertiser |
+| `/api/admin/advertising/packages` | GET, POST | Admin | `createPackageSchema` | List all / create package |
+| `/api/admin/advertising/packages/[id]` | PUT | Admin | `updatePackageSchema` | Update single package |
+| `/api/admin/advertising/slots` | GET, POST | Admin | `createSlotSchema` | List all (with occupancy) / create slot |
+| `/api/admin/advertising/slots/[id]` | PUT | Admin | `updateSlotSchema` | Update single slot |
+| `/api/admin/advertising/campaigns` | GET, POST | Admin | `createCampaignSchema` | List (filterable by status) / create campaign |
+| `/api/admin/advertising/campaigns/[id]` | GET, PUT | Admin | `updateCampaignSchema` | Get detail (with creatives, slots, metrics) / update campaign |
+| `/api/admin/advertising/campaigns/[id]/creatives` | GET, POST | Admin (manual) | Inline (formData) | List / upload creative image with dimension validation |
+| `/api/admin/advertising/campaigns/[id]/creatives/[creativeId]` | PUT, DELETE | Admin (manual) | Inline | Toggle active / delete creative |
+| `/api/admin/advertising/campaigns/[id]/slots` | POST, DELETE | Admin | `slotAssignmentSchema` / `slotRemovalSchema` | Assign / unassign slot to campaign |
+| `/api/admin/advertising/analytics` | GET | Admin | Query params | Aggregated performance metrics with date range and grouping |
+
+All schemas live in `lib/validations/advertising.ts`. Creative routes use raw `NextRequest` handlers (not `createAdminRoute`) because they consume `request.formData()`.
+
+### AdSlot Component Contract
+
+**File:** `components/ads/AdSlot.tsx` (client component)
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `slotKey` | `string` | Required | Unique identifier matching `ad_slots.slot_key` |
+| `pageContext` | `string` | Required | Page context value from `AdPageContext` |
+| `targetAudience` | `AdTargetAudience` | `"all"` | Audience targeting filter |
+| `className` | `string` | `undefined` | Additional CSS classes for the wrapper |
+
+**Behavior:**
+- On mount, fetches ads from `GET /api/ads/serve?slot={slotKey}&page={pageContext}&audience={targetAudience}`
+- **Empty state:** Returns `null` — absolutely no DOM output. No placeholder, no skeleton, no whitespace.
+- Displays an "Ad" label overlay (top-left, semi-transparent black badge) for transparency
+- Responsive: renders separate desktop and mobile `<img>` elements for slot types with mobile dimensions
+- Lazy loads images (`loading="lazy"`) with opacity fade-in transition on load
+- Records impressions via `recordImpression()` only when `isAdTrackingAllowed()` returns true
+- Uses `role="complementary"` and `aria-label="Advertisement"` for accessibility
+
+**Companion:** `AdSlotSkeleton` — dimension-matched loading placeholder (used during page transitions if needed)
+
+### DB Helper Module Reference
+
+All ad system database functions are accessed via the barrel export at `lib/db/advertising.ts`, which re-exports from 8 modular files:
+
+| Module | Key Functions |
+|--------|--------------|
+| `lib/db/ad-advertisers.ts` | `createAdvertiser`, `updateAdvertiser`, `getAdvertiser`, `listAdvertisers` |
+| `lib/db/ad-packages.ts` | `createPackage`, `updatePackage`, `getPackage`, `listPackages` |
+| `lib/db/ad-slots.ts` | `createSlot`, `updateSlot`, `getSlot`, `getSlotByKey`, `listSlots` |
+| `lib/db/ad-campaigns.ts` | `createCampaign`, `updateCampaign`, `updateCampaignStatus`, `getCampaign`, `listCampaigns` |
+| `lib/db/ad-creatives.ts` | `createCreative`, `deleteCreative`, `listCreativesByCampaign`, `toggleCreativeActive`, `getCreative` |
+| `lib/db/ad-campaign-slots.ts` | `assignCampaignToSlot`, `removeCampaignFromSlot`, `listCampaignSlots`, `listAvailableSlotsForPackage` |
+| `lib/db/ad-serving.ts` | `getActiveAdsForSlot` — core serving query: slot lookup -> campaign filter -> package audience filter -> creative fetch -> priority sort |
+| `lib/db/ad-analytics.ts` | `getImpressionsByDateRange`, `getClicksByDateRange`, `getCTRByCampaign`, `getCTRBySlot`, `getSlotFillRate`, `getCampaignPerformanceSummary`, `getRevenueByPeriod` |
+
+All functions use the admin client (`createAdminClient()`) because ad tables are service-role-only.
+
+### Constants Reference
+
+`lib/constants/ad-system.ts` exports:
+
+| Export | Purpose |
+|--------|---------|
+| `AD_SLOT_DIMENSIONS` | Desktop + mobile dimensions per slot type |
+| `AD_SLOT_TYPES` | Slot type options with labels |
+| `AD_PAGE_CONTEXTS` | Page contexts with `isPublic` and `trafficTier` |
+| `AD_TARGET_AUDIENCES` | Target audience options |
+| `AD_TRAFFIC_TIERS` | Traffic tier options |
+| `AD_PACKAGE_TIERS` | Package tier options with descriptions |
+| `AD_DURATION_OPTIONS` | Campaign duration options (7, 14, 30, 90 days) |
+| `AD_ROTATION_INTERVAL_MS` | Default rotation interval (4000 ms) |
+| `AD_MAX_FILE_SIZE_KB` / `AD_MAX_FILE_SIZE_BYTES` | Upload limit (2048 KB / 2,097,152 bytes) |
+| `AD_ALLOWED_FORMATS` | Allowed MIME types |
+| `AD_ALLOWED_EXTENSIONS` | Allowed file extensions |
+| `AD_CAMPAIGN_STATUSES` | Status options with UI badge colors |
+| `AD_PAYMENT_STATUSES` | Payment status options with UI badge colors |
+| `getCampaignStatusConfig(status)` | Get display config for a campaign status |
+| `getPaymentStatusConfig(status)` | Get display config for a payment status |
+| `getSlotDimensions(slotType, isMobile?)` | Get responsive dimensions |
+| `formatCents(cents)` | Format cents to USD currency string |
+
+### Admin UI Page Inventory
+
+| Page | Route | Purpose |
+|------|-------|---------|
+| Ad Space Dashboard | `/admin/ad-space` | Overview: active campaigns count, revenue, impressions, clicks, CTR, empty slots |
+| Advertisers | `/admin/ad-space/advertisers` | List, create, edit advertisers |
+| Packages | `/admin/ad-space/packages` | List, create, edit pricing tiers |
+| Slots | `/admin/ad-space/slots` | List, create, edit ad placements with occupancy indicators |
+| Campaigns | `/admin/ad-space/campaigns` | Filterable campaign list with status tabs |
+| Campaign Detail | `/admin/ad-space/campaigns/[id]` | Full campaign management with sub-components |
+| Analytics | `/admin/ad-space/analytics` | Date-ranged performance charts and tables |
+
+**Campaign detail sub-components** (in `app/(admin)/admin/ad-space/campaigns/[id]/`):
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Campaign Header | `campaign-header.tsx` | Name, status badge, advertiser, package, date range |
+| Campaign Billing | `campaign-billing.tsx` | Price, payment status, invoice reference, paid date |
+| Campaign Creatives | `campaign-creatives.tsx` | Upload, preview, toggle, delete creative images |
+| Campaign Slots | `campaign-slots.tsx` | Assign/unassign compatible slots |
+| Campaign Performance | `campaign-performance.tsx` | Impressions, clicks, CTR by slot and creative |
+
+---
+
+## 10. Component Contracts
 
 These are the non-negotiable rules every component must follow. Violating these is a build error, not a style preference.
 
-### 9a. Content Visibility Gate
+### 10a. Content Visibility Gate
 
 Any component that renders another user's profile, listing, or any user-generated content card must check the target user's `content_visibility` before rendering:
 
@@ -496,7 +775,7 @@ if (user.content_visibility === "auto_hidden" || user.content_visibility === "ad
 
 The user's own content is always visible to themselves (they see the `ModerationBanner` instead).
 
-### 9b. Account Status Action Gate
+### 10b. Account Status Action Gate
 
 Any component that allows a user to perform an action (apply to a job, send a message, post to the forum, submit a flag, create a listing) must verify the user's `account_status` permits that action:
 
@@ -504,7 +783,7 @@ Any component that allows a user to perform an action (apply to a job, send a me
 - `restricted`: only actions on own profile permitted — block community actions
 - `warned` / `pending_review`: actions are permitted — do not block, just show the banner
 
-### 9c. Flagging Components
+### 10c. Flagging Components
 
 Any component that adds a "Report" or "Flag" button must:
 1. Only show the flag option to authenticated users
@@ -515,7 +794,7 @@ Any component that adds a "Report" or "Flag" button must:
 
 Flag categories must come from the defined enum — do not add new categories without updating the DB enum and TypeScript type.
 
-### 9d. ModerationBanner Placement
+### 10d. ModerationBanner Placement
 
 The `ModerationBanner` component must be placed at the top of the main content area in:
 - Dashboard layouts
@@ -524,7 +803,7 @@ The `ModerationBanner` component must be placed at the top of the main content a
 
 It is self-contained and renders nothing for users with clean status.
 
-### 9e. Shared Components First
+### 10e. Shared Components First
 
 Before building a new UI primitive, check `components/shared/index.ts`. The following already exist and must be used:
 
@@ -551,7 +830,7 @@ Before building a new UI primitive, check `components/shared/index.ts`. The foll
 | `Logo` | App logo (always use this, never hardcode text) |
 | `ImageUpload` | Drag-and-drop image upload with preview, progress bar, and remove control — use for all company logo/banner uploads |
 
-### 9f. No Direct DB Writes from Components
+### 10f. No Direct DB Writes from Components
 
 Components must never import Supabase clients and query the database directly. All data operations go through:
 - API routes (server-side actions)
@@ -559,13 +838,13 @@ Components must never import Supabase clients and query the database directly. A
 
 Exception: `AuthProvider` reads profile data directly via the Supabase client — this is intentional and the only approved exception.
 
-### 9g. "use client" Directive
+### 10g. "use client" Directive
 
 Any component that uses `useState`, `useEffect`, `useRef`, `useCallback`, `useMemo`, or any hook must have `"use client"` as its first line. Next.js Server Components are the default — do not add `"use client"` to components that do not need it.
 
 ---
 
-## 10. API Route Patterns
+## 11. API Route Patterns
 
 ### Route Wrappers
 
@@ -645,12 +924,27 @@ The upload routes at `app/api/upload/company-logo/` and `app/api/upload/company-
 | `/api/company/invitations/revoke` | POST | Required | `revokeInvitationSchema` | Revoke a pending invitation (owner only) |
 | `/api/company/locations` | GET, POST, PUT | Required | `companyLocationSchema` / `updateCompanyLocationSchema` | List, add, or update locations |
 | `/api/company/locations/deactivate` | POST | Required | `deactivateLocationSchema` | Soft-deactivate a location |
+| `/api/ads/serve` | GET | None | Query params | Returns active creatives for a slot with signed image URLs |
+| `/api/ads/impression` | POST | None | Inline (Zod) | Records impression event; checks CCPA opt-out server-side |
+| `/api/ads/click/[creativeId]` | GET | None | Query params | Records click, 302 redirects to destination URL |
+| `/api/admin/advertising/advertisers` | GET, POST | Admin | `createAdvertiserSchema` | List all / create advertiser |
+| `/api/admin/advertising/advertisers/[id]` | GET, PUT | Admin | `updateAdvertiserSchema` | Get / update advertiser |
+| `/api/admin/advertising/packages` | GET, POST | Admin | `createPackageSchema` | List all / create package |
+| `/api/admin/advertising/packages/[id]` | PUT | Admin | `updatePackageSchema` | Update package |
+| `/api/admin/advertising/slots` | GET, POST | Admin | `createSlotSchema` | List all (with occupancy) / create slot |
+| `/api/admin/advertising/slots/[id]` | PUT | Admin | `updateSlotSchema` | Update slot |
+| `/api/admin/advertising/campaigns` | GET, POST | Admin | `createCampaignSchema` | List (filterable) / create campaign |
+| `/api/admin/advertising/campaigns/[id]` | GET, PUT | Admin | `updateCampaignSchema` | Get detail / update campaign |
+| `/api/admin/advertising/campaigns/[id]/creatives` | GET, POST | Admin (manual) | Inline (formData) | List / upload creative image |
+| `/api/admin/advertising/campaigns/[id]/creatives/[creativeId]` | PUT, DELETE | Admin (manual) | Inline | Toggle active / delete creative |
+| `/api/admin/advertising/campaigns/[id]/slots` | POST, DELETE | Admin | `slotAssignmentSchema` / `slotRemovalSchema` | Assign / unassign slot |
+| `/api/admin/advertising/analytics` | GET | Admin | Query params | Aggregated performance metrics |
 
-All company/* schemas live in `lib/validations/company.ts`. Upload schemas live in `lib/validations/upload.ts`.
+All company/* schemas live in `lib/validations/company.ts`. Upload schemas live in `lib/validations/upload.ts`. Advertising schemas live in `lib/validations/advertising.ts`.
 
 ---
 
-## 11. Error Handling System
+## 12. Error Handling System
 
 ### Error Codes
 
@@ -694,7 +988,7 @@ if (!result.data?.success) {
 
 ---
 
-## 12. Design System
+## 13. Design System
 
 ### Color Palette
 
@@ -776,7 +1070,7 @@ Build mobile-first. All layouts must work at: 320px (minimum), 768px (tablet), 1
 
 ---
 
-## 13. Database Schema Quick Reference
+## 14. Database Schema Quick Reference
 
 ### Key Tables
 
@@ -801,6 +1095,15 @@ Build mobile-first. All layouts must work at: 320px (minimum), 768px (tablet), 1
 | `data_export_requests` | Data export queue | `status`, `download_url`, `download_expires_at` |
 | `email_verifications` | Email verification tokens | `token`, `expires_at`, `verified_at` |
 | `invitations` | Admin invitation tokens | `token`, `expires_at`, `accepted_at` |
+| `advertisers` | Companies/individuals purchasing ad space (admin-managed) | `name`, `contact_email`, `is_active` |
+| `ad_packages` | Purchasable advertising tiers with pricing and slot/audience config | `tier`, `price_cents`, `duration_days`, `included_slot_types`, `included_page_contexts`, `target_audience`, `priority_weight`, `rotation_interval_seconds` |
+| `ad_slots` | Physical ad placements on specific pages with dimensions | `slot_key` (unique), `slot_type`, `page_context`, `width_px`, `height_px`, `traffic_tier`, `target_audience`, `is_active` |
+| `ad_campaigns` | Sold advertising engagements linking advertiser to package | `advertiser_id`, `ad_package_id`, `status`, `starts_at`, `ends_at`, `payment_status`, `total_price_cents`, `created_by` |
+| `ad_creatives` | Campaign image files targeting specific slot types | `campaign_id`, `image_storage_path`, `destination_url`, `slot_type`, `width_px`, `height_px`, `is_active` |
+| `ad_campaign_slots` | Junction table linking campaigns to slots | `campaign_id`, `ad_slot_id`, `is_active` |
+| `ad_impressions` | Anonymized ad render events with session-level tracking | `ad_campaign_id`, `ad_creative_id`, `ad_package_id`, `session_token`, `page_context`, `ad_slot`, `rendered_at` |
+| `ad_clicks` | Anonymized click tracking with redirect data | `ad_campaign_id`, `ad_creative_id`, `ad_package_id`, `impression_id`, `session_token`, `page_context`, `clicked_at` |
+| `ad_consent_log` | CCPA advertising opt-out/in audit trail | `user_id`, `opted_out`, `source` |
 
 ### Enum Values (DB and TypeScript must stay in sync)
 
@@ -822,7 +1125,16 @@ ResumeTemplate:   "standard" | "modern" | "minimal"
 ResumeAccentColor: "charcoal" | "navy" | "forest"
 TeamMemberRole:   "owner" | "member"
 TeamInvitationStatus: "pending" | "accepted" | "expired" | "revoked"
+AdPackageTier:     "starter" | "professional" | "premium" | "elite"
+AdSlotType:        "leaderboard" | "banner" | "sidebar" | "inline" | "sticky_footer"
+AdPageContext:     "home" | "jobs" | "forum" | "network" | "marketplace" | "blog" | "shop" | "dashboard"
+AdTargetAudience:  "all" | "installer" | "employer"
+AdTrafficTier:     "high" | "medium" | "low"
+AdCampaignStatus:  "draft" | "scheduled" | "active" | "paused" | "completed" | "cancelled"
+AdPaymentStatus:   "unpaid" | "invoiced" | "paid" | "refunded"
 ```
+
+**Note:** Ad system types use Postgres CHECK constraints (not pg enums) but follow the same sync rule — the TypeScript types in `lib/types/database.ts` must match exactly.
 
 ### RLS Policy Rules
 
@@ -888,7 +1200,7 @@ This rule applies to any extension-provided function: `extensions.gen_random_byt
 
 ---
 
-## 14. Feature Status Map
+## 15. Feature Status Map
 
 ### Built and Functional
 
@@ -913,6 +1225,9 @@ This rule applies to any extension-provided function: `extensions.gen_random_byt
 | Banned page | `/banned` | |
 | Restricted page | `/restricted` | |
 | Resume builder | `/dashboard/resume`, `/api/resume` | 3 templates (Standard, Modern, Minimal), live preview rendered as fixed 8.5×11 letter-page (816×1056px canvas scaled to sidebar width via CSS transform — proportions match printed output exactly); contact info (email, phone, city/state) and experience level sourced from `installer_profiles` and displayed read-only in the form and rendered in all three template headers; `show_photo` boolean on `installer_resumes` controls whether the installer's `photo_storage_path` is rendered as a circular/rounded thumbnail in the template header; photo URL is resolved server-side as a signed URL at page load; no public resume viewer exists — resumes are only accessible to authenticated users in the dashboard |
+| First-party ad system | `/admin/ad-space/**`, `/api/admin/advertising/**`, `/api/ads/**` | Admin-managed, invoice-based. Full advertiser/package/slot/campaign/creative CRUD; ad serving with signed URLs; rotation with impression tracking; click tracking via 302 redirect; anonymous session tokens; CCPA opt-out enforced client + server. See section 9 for full documentation. |
+| Ad consent tracking | `/dashboard/settings` (advertising preferences), `/api/user/advertising-preferences` | CCPA opt-out via `profiles.targeted_ads_opted_out`; `ad_consent_log` audit trail; `AdvertisingPreferencesSection` in settings |
+| Ad admin dashboard | `/admin/ad-space` | Overview metrics, advertiser management, package/slot/campaign CRUD, creative upload, slot assignment, analytics charts |
 
 ### Scaffolded (Coming Soon UI)
 
@@ -958,6 +1273,21 @@ This rule applies to any extension-provided function: `extensions.gen_random_byt
 | Team member dashboard | Phase E | `/dashboard/team/page.tsx`; read-only company view, Leave Team with `ConfirmationDialog`, owner → employer link |
 | Onboarding select-type (3-card) | Phase F | `/onboarding/select-type`: Installer, Employer, Join a Team (informational, invitation-only) |
 | `lib/types/database.ts` complete | Phase F | All tables in `Database` interface; `ConsentLog`, `DeletionRequest`, `DataExportRequest`, `DpaRequest` type aliases added; `Database.Enums` matches all 8 actual DB enums |
+| Ad compliance infrastructure (pre-existing) | Ad Phase 0 | `targeted_ads_opted_out` on `profiles`; `ad_consent_log`, `ad_impressions`, `ad_clicks` tables with RLS; migration `20260314151824` |
+| Ad system core tables | Ad Phase 1 | `advertisers`, `ad_packages`, `ad_slots`, `ad_campaigns`, `ad_creatives`, `ad_campaign_slots` tables; FKs added to `ad_impressions`/`ad_clicks`; service-role RLS; migration `20260411125751` |
+| Ad creatives storage bucket | Ad Phase 2 | `ad-creatives` private bucket; 2 MB limit; JPEG/PNG/WebP/GIF; service-role RLS; migration `20260411130441` |
+| Ad storage utilities | Ad Phase 2 | `lib/storage/ad-creatives.ts`: upload, replace, delete, signed URL, batch signed URL, path builder |
+| Ad DB helper modules | Ad Phase 3 | 8 files in `lib/db/ad-*.ts` (barrel via `lib/db/advertising.ts`): advertisers, packages, slots, campaigns, creatives, campaign-slots, serving, analytics |
+| Ad validation schemas | Ad Phase 3 | `lib/validations/advertising.ts`: 10 Zod schemas + type exports for all ad CRUD operations |
+| Ad constants and enums | Ad Phase 3 | `lib/constants/ad-system.ts`: dimensions, page contexts, tier configs, status badges, format limits, helper functions |
+| Ad session tracking utilities | Ad Phase 3 | `lib/utils/ad-session.ts`: anonymous session cookie, tracking consent check, impression recording, click URL builder |
+| Ad TypeScript types | Ad Phase 3 | `lib/types/database.ts`: 7 type aliases (AdPackageTier through AdPaymentStatus) + 9 table row types + Database interface entries |
+| Admin advertising API routes (12 endpoints) | Ad Phase 3 | Full CRUD for advertisers, packages, slots, campaigns, creatives, slot assignments, analytics; all via `createAdminRoute` (except creative upload/delete which use raw handlers for formData) |
+| Public ad serving API routes (3 endpoints) | Ad Phase 3 | `/api/ads/serve` (GET), `/api/ads/impression` (POST), `/api/ads/click/[creativeId]` (GET redirect) |
+| `AdSlot` component | Ad Phase 4 | `components/ads/AdSlot.tsx`: client component; fetches, rotates, tracks impressions/clicks; graceful null empty state; responsive; CCPA-aware |
+| `AdSlotSkeleton` component | Ad Phase 4 | `components/ads/AdSlotSkeleton.tsx`: dimension-matched loading placeholder |
+| Admin ad space UI (7 pages + 5 sub-components) | Ad Phase 5 | `/admin/ad-space`: dashboard, advertisers, packages, slots, campaigns (list + detail), analytics; campaign detail has header, billing, creatives, slots, performance sub-components |
+| Ad slot page placement | Pending | `AdSlot` component is built and ready but not yet placed on any live pages (home, jobs, forum, etc.) — integration happens when those page layouts are built |
 
 ### Not Started
 
@@ -965,8 +1295,6 @@ This rule applies to any extension-provided function: `extensions.gen_random_byt
 |---------|-------|-----------|
 | Direct messaging | Phase 4 | Standalone |
 | Message compliance (delete, block, report) | Phase 4 | Messaging feature |
-| First-party ad system | Phase 6 | Business decision |
-| Ad consent tracking | Phase 6 | Ad system |
 | DPA enforcement flow (EU/UK employer prompt) | Phase 7 | GDPR infrastructure (complete) |
 | Public installer/employer profile pages | Phase G | Standalone |
 | Network/search scaffolding | Phase G | Profile pages |
@@ -987,7 +1315,7 @@ This rule applies to any extension-provided function: `extensions.gen_random_byt
 
 ---
 
-## 15. File and Folder Conventions
+## 16. File and Folder Conventions
 
 ### Where Things Live
 
@@ -1017,6 +1345,15 @@ This rule applies to any extension-provided function: `extensions.gen_random_byt
 | Legal document versions | `lib/legal/versions.ts` |
 | DB migrations | `supabase/migrations/` |
 | Storage utilities | `lib/storage/` |
+| Ad display components | `components/ads/` |
+| Ad system constants | `lib/constants/ad-system.ts` |
+| Ad storage utilities | `lib/storage/ad-creatives.ts` |
+| Ad DB helpers (8 modules) | `lib/db/ad-*.ts` (barrel: `lib/db/advertising.ts`) |
+| Ad session/tracking utilities | `lib/utils/ad-session.ts` |
+| Ad validation schemas | `lib/validations/advertising.ts` |
+| Ad admin pages | `app/(admin)/admin/ad-space/` |
+| Ad public API routes | `app/api/ads/` |
+| Ad admin API routes | `app/api/admin/advertising/` |
 
 ### Naming Conventions
 
@@ -1051,6 +1388,7 @@ If a file exceeds ~250 lines, split it. Components with sub-components, helpers,
 | Bucket | Visibility | Max File Size | Allowed Types | Path Structure |
 |--------|-----------|--------------|--------------|----------------|
 | `company-assets` | Private | 5 MB | JPEG, PNG, WebP | `/{employer_profile_id}/{logo\|banner}/{filename}` |
+| `ad-creatives` | Private | 2 MB | JPEG, PNG, WebP, GIF | `/{campaign_id}/{creative_id}/{filename}` |
 
 **company-assets RLS rules:**
 - All four operations (SELECT, INSERT, UPDATE, DELETE) check: `auth.uid()` must be the `user_id` of the `employer_profiles` row whose `id` matches `split_part(name, '/', 1)` (the first path segment)
@@ -1069,6 +1407,24 @@ If a file exceeds ~250 lines, split it. Components with sub-components, helpers,
 | `getSignedUrls(paths[], ttlSeconds?)` | Batch signed URL generation |
 | `buildStoragePath(profileId, folder, originalFilename)` | Generate a sanitized, timestamped path |
 
+**ad-creatives RLS rules:**
+- All four operations (SELECT, INSERT, UPDATE, DELETE) are restricted to the service role only — no authenticated user policies
+- All storage operations go through `lib/storage/ad-creatives.ts` using the admin client
+- Signed URLs are generated server-side at ad serve time (1-hour TTL)
+
+**Storage utility functions** (`lib/storage/ad-creatives.ts`):
+
+| Function | Purpose |
+|----------|---------|
+| `uploadAdCreative(campaignId, creativeId, filename, file, contentType)` | Upload with upsert |
+| `replaceAdCreative(campaignId, creativeId, filename, file, contentType)` | Delete folder then upload |
+| `deleteAdCreative(storagePath)` | Remove a single file |
+| `deleteAdCreativeFolder(campaignId, creativeId)` | Remove all files for a creative |
+| `deleteCampaignCreatives(campaignId)` | Remove all creatives for a campaign |
+| `getAdCreativeSignedUrl(storagePath, ttlSeconds?)` | Generate signed URL (default 1 hour) |
+| `getAdCreativeSignedUrls(paths[], ttlSeconds?)` | Batch signed URL generation |
+| `buildAdCreativeStoragePath(campaignId, creativeId, originalFilename)` | Generate sanitized, timestamped path |
+
 ---
 
-*Last updated: Phase 1 + 2 foundation complete. Phase 3 resume builder complete. Phase 3.1 resume-level flagging complete. Phase 3.2 resume contact info and photo complete: `show_photo` boolean added to `installer_resumes` (migration `add_show_photo_to_installer_resumes`); all three resume templates (Standard, Modern, Minimal) now render contact info (email, phone, city/state, experience level) and optionally a profile photo in the header; contact info is sourced read-only from `installer_profiles` and `auth.users`; photo signed URL resolved server-side at page load; `ResumeForm` has a new "Contact Info" accordion section showing read-only values and a "Show Profile Photo" toggle (only shown when a photo exists); no public resume viewer exists or was added. Employer Phase A–E complete (see above). Employer Phase F complete: `/onboarding/select-type` rebuilt with three cards — Installer (routes to `/onboarding/installer`), Employer (routes to `/onboarding/employer`), Join a Team (informational only — explains invitation-only access, no form, no navigation); `lib/types/database.ts` fully audited and completed — `consent_log`, `deletion_requests`, `data_export_requests`, `dpa_requests` tables added to `Database` interface with Row/Insert/Update shapes from live DB schema, corresponding `ConsentLog`, `DeletionRequest`, `DataExportRequest`, `DpaRequest` type aliases exported; `Database.Enums` block verified to contain only the 8 actual DB pg enum types; all DB enums and TypeScript types confirmed in sync per section 13 rule; BUILDREF section 4 Onboarding Flow paragraph updated to document the three-card select-type flow and the invitation-only team join path. Phase A addendum: `is_distributor` boolean added to `employer_profiles` (migration `20260315165407`, RPC update `20260315165646`); both `is_vendor` and `is_distributor` are now fully wired end-to-end — DB column → RPC → TypeScript type → validation schema → creation form → dashboard display; section 13 employer_profiles logic-driving columns updated; section 14 Feature Status Map updated. GDPR/EU/UK infrastructure addendum: all EU/UK serving infrastructure is live and complete prior to Phase G — server-side IP region detection (`lib/geo/region.ts`), `profiles.country_code` column, `dpa_requests` table with RLS, GDPR-aware `CookieConsentBanner`, DPA page (`/legal/dpa`), GDPR rights in Privacy Policy, ePrivacy/PECR cookie policy, legal document versioning (`lib/legal/versions.ts`), and 7-year anonymized retention for consent/DPA records; section 8 Data Privacy rules updated with EU/UK GDPR subsection, two-layer region detection description, and 7-year retention note; section 14 Feature Status Map corrected — GDPR infrastructure moved to its own "Complete" table, remaining open item (DPA enforcement flow) listed under "Not Started" Phase 7. Auth system fix: dual email verification conflict resolved — `email_confirm: true` used at registration to bypass Supabase's built-in gate entirely; `profiles.email_verified_at` is now the single source of truth; Supabase "Email not confirmed" intercept removed from login route; `auth.users.email_confirmed_at` synced for all existing users via migration; section 6 updated with "Email Verification — Single System" documentation. RPC extension schema fix: `invite_team_member` token generation updated from `gen_random_bytes(24)` to `extensions.gen_random_bytes(24)`; section 13 RPC Function Reference updated with `search_path` + extension schema rule documenting that all extension-provided functions (`pgcrypto`, `uuid-ossp`, etc.) must use the `extensions.` prefix inside `SECURITY DEFINER` RPCs that declare `SET search_path = public`. Next: Phase G (public installer/employer profile pages with visibility gating, installer profile inline-edit parity, and network/search scaffolding). Team invite email fix: `POST /api/company/team/invite` now calls `sendTeamInvitationEmail()` after the RPC succeeds, using the `/invite/team/${token}` accept path and passing `token` and `email` from the `InviteTeamMemberResult`; if email delivery fails the route logs a warning and still returns 201 so the invitation record is never silently lost.*
+*Last updated: Phase 1 + 2 foundation complete. Phase 3 resume builder complete. Phase 3.1 resume-level flagging complete. Phase 3.2 resume contact info and photo complete: `show_photo` boolean added to `installer_resumes` (migration `add_show_photo_to_installer_resumes`); all three resume templates (Standard, Modern, Minimal) now render contact info (email, phone, city/state, experience level) and optionally a profile photo in the header; contact info is sourced read-only from `installer_profiles` and `auth.users`; photo signed URL resolved server-side at page load; `ResumeForm` has a new "Contact Info" accordion section showing read-only values and a "Show Profile Photo" toggle (only shown when a photo exists); no public resume viewer exists or was added. Employer Phase A–E complete (see above). Employer Phase F complete: `/onboarding/select-type` rebuilt with three cards — Installer (routes to `/onboarding/installer`), Employer (routes to `/onboarding/employer`), Join a Team (informational only — explains invitation-only access, no form, no navigation); `lib/types/database.ts` fully audited and completed — `consent_log`, `deletion_requests`, `data_export_requests`, `dpa_requests` tables added to `Database` interface with Row/Insert/Update shapes from live DB schema, corresponding `ConsentLog`, `DeletionRequest`, `DataExportRequest`, `DpaRequest` type aliases exported; `Database.Enums` block verified to contain only the 8 actual DB pg enum types; all DB enums and TypeScript types confirmed in sync per section 13 rule; BUILDREF section 4 Onboarding Flow paragraph updated to document the three-card select-type flow and the invitation-only team join path. Phase A addendum: `is_distributor` boolean added to `employer_profiles` (migration `20260315165407`, RPC update `20260315165646`); both `is_vendor` and `is_distributor` are now fully wired end-to-end — DB column → RPC → TypeScript type → validation schema → creation form → dashboard display; section 13 employer_profiles logic-driving columns updated; section 14 Feature Status Map updated. GDPR/EU/UK infrastructure addendum: all EU/UK serving infrastructure is live and complete prior to Phase G — server-side IP region detection (`lib/geo/region.ts`), `profiles.country_code` column, `dpa_requests` table with RLS, GDPR-aware `CookieConsentBanner`, DPA page (`/legal/dpa`), GDPR rights in Privacy Policy, ePrivacy/PECR cookie policy, legal document versioning (`lib/legal/versions.ts`), and 7-year anonymized retention for consent/DPA records; section 8 Data Privacy rules updated with EU/UK GDPR subsection, two-layer region detection description, and 7-year retention note; section 14 Feature Status Map corrected — GDPR infrastructure moved to its own "Complete" table, remaining open item (DPA enforcement flow) listed under "Not Started" Phase 7. Auth system fix: dual email verification conflict resolved — `email_confirm: true` used at registration to bypass Supabase's built-in gate entirely; `profiles.email_verified_at` is now the single source of truth; Supabase "Email not confirmed" intercept removed from login route; `auth.users.email_confirmed_at` synced for all existing users via migration; section 6 updated with "Email Verification — Single System" documentation. RPC extension schema fix: `invite_team_member` token generation updated from `gen_random_bytes(24)` to `extensions.gen_random_bytes(24)`; section 13 RPC Function Reference updated with `search_path` + extension schema rule documenting that all extension-provided functions (`pgcrypto`, `uuid-ossp`, etc.) must use the `extensions.` prefix inside `SECURITY DEFINER` RPCs that declare `SET search_path = public`. Team invite email fix: `POST /api/company/team/invite` now calls `sendTeamInvitationEmail()` after the RPC succeeds, using the `/invite/team/${token}` accept path and passing `token` and `email` from the `InviteTeamMemberResult`; if email delivery fails the route logs a warning and still returns 201 so the invitation record is never silently lost. Ad system Phases 1–5 complete (full documentation in section 9): Phase 0 — ad compliance infrastructure (`targeted_ads_opted_out` on profiles, `ad_consent_log`, `ad_impressions`, `ad_clicks` tables, migration `20260314151824`); Phase 1 — core ad system tables (`advertisers`, `ad_packages`, `ad_slots`, `ad_campaigns`, `ad_creatives`, `ad_campaign_slots`) with CHECK constraints, indexes, and service-role RLS (migration `20260411125751`); Phase 2 — `ad-creatives` private storage bucket with 2 MB limit, JPEG/PNG/WebP/GIF support, and `lib/storage/ad-creatives.ts` utilities (migration `20260411130441`); Phase 3 — 8 DB helper modules (`lib/db/ad-*.ts` barrel via `lib/db/advertising.ts`), 10 Zod validation schemas (`lib/validations/advertising.ts`), ad constants with dimensions/contexts/tiers/statuses (`lib/constants/ad-system.ts`), anonymous session token management (`lib/utils/ad-session.ts`), 7 ad TypeScript types + 9 table row types (`lib/types/database.ts`), 12 admin API routes under `/api/admin/advertising/` and 3 public routes under `/api/ads/`; Phase 4 — `AdSlot` client component (`components/ads/AdSlot.tsx`) with fetch, rotation, impression/click tracking, CCPA-aware display, responsive mobile/desktop images, null empty state, and `AdSlotSkeleton`; Phase 5 — 7 admin UI pages + 5 campaign detail sub-components under `/admin/ad-space/` covering dashboard overview, advertiser/package/slot/campaign CRUD, creative upload with dimension validation, slot assignment, and analytics dashboard; all sections of BUILDREF updated: new section 9 (Advertising System) inserted with 15 subsections, ToC renumbered (9→10 through 15→16), section 15 Feature Status Map updated (ad items moved from "Not Started" to "Built and Functional" and "Schema + RPC Layer Complete"), section 14 Database Schema Quick Reference updated with 9 ad tables and 7 ad enum types, section 16 File and Folder Conventions updated with 10 ad file locations, section 11 Route Inventory updated with 15 ad API routes, Storage Buckets table updated with `ad-creatives` bucket plus RLS and utility function reference. Next: Phase G (public installer/employer profile pages with visibility gating, installer profile inline-edit parity, and network/search scaffolding).*
