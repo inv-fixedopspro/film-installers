@@ -12,6 +12,14 @@ export type TeamInvitationStatus = "pending" | "accepted" | "expired" | "revoked
 export type ResumeTemplate = "standard" | "modern" | "minimal";
 export type ResumeAccentColor = "charcoal" | "navy" | "forest";
 
+export type AdPackageTier = "starter" | "professional" | "premium" | "elite";
+export type AdSlotType = "leaderboard" | "banner" | "sidebar" | "inline" | "sticky_footer";
+export type AdPageContext = "home" | "jobs" | "forum" | "network" | "marketplace" | "blog" | "shop" | "dashboard";
+export type AdTargetAudience = "all" | "installer" | "employer";
+export type AdTrafficTier = "high" | "medium" | "low";
+export type AdCampaignStatus = "draft" | "scheduled" | "active" | "paused" | "completed" | "cancelled";
+export type AdPaymentStatus = "unpaid" | "invoiced" | "paid" | "refunded";
+
 export interface ResumeWorkHistory {
   id: string;
   company_name: string;
@@ -796,6 +804,361 @@ export interface Database {
           created_at?: string;
         };
       };
+      advertisers: {
+        Row: {
+          id: string;
+          name: string;
+          contact_email: string;
+          contact_phone: string | null;
+          company_url: string | null;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          contact_email: string;
+          contact_phone?: string | null;
+          company_url?: string | null;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          contact_email?: string;
+          contact_phone?: string | null;
+          company_url?: string | null;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      ad_packages: {
+        Row: {
+          id: string;
+          name: string;
+          tier: AdPackageTier;
+          price_cents: number;
+          duration_days: number;
+          max_creatives: number;
+          included_slot_types: AdSlotType[];
+          included_page_contexts: AdPageContext[];
+          target_audience: AdTargetAudience;
+          rotation_interval_seconds: number;
+          priority_weight: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          tier?: AdPackageTier;
+          price_cents: number;
+          duration_days?: number;
+          max_creatives?: number;
+          included_slot_types?: AdSlotType[];
+          included_page_contexts?: AdPageContext[];
+          target_audience?: AdTargetAudience;
+          rotation_interval_seconds?: number;
+          priority_weight?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          tier?: AdPackageTier;
+          price_cents?: number;
+          duration_days?: number;
+          max_creatives?: number;
+          included_slot_types?: AdSlotType[];
+          included_page_contexts?: AdPageContext[];
+          target_audience?: AdTargetAudience;
+          rotation_interval_seconds?: number;
+          priority_weight?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      ad_slots: {
+        Row: {
+          id: string;
+          slot_key: string;
+          display_name: string;
+          slot_type: AdSlotType;
+          page_context: AdPageContext;
+          width_px: number;
+          height_px: number;
+          max_file_size_kb: number;
+          allowed_formats: string[];
+          is_public_page: boolean;
+          traffic_tier: AdTrafficTier;
+          target_audience: AdTargetAudience;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slot_key: string;
+          display_name: string;
+          slot_type: AdSlotType;
+          page_context: AdPageContext;
+          width_px: number;
+          height_px: number;
+          max_file_size_kb?: number;
+          allowed_formats?: string[];
+          is_public_page?: boolean;
+          traffic_tier?: AdTrafficTier;
+          target_audience?: AdTargetAudience;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          slot_key?: string;
+          display_name?: string;
+          slot_type?: AdSlotType;
+          page_context?: AdPageContext;
+          width_px?: number;
+          height_px?: number;
+          max_file_size_kb?: number;
+          allowed_formats?: string[];
+          is_public_page?: boolean;
+          traffic_tier?: AdTrafficTier;
+          target_audience?: AdTargetAudience;
+          is_active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      ad_campaigns: {
+        Row: {
+          id: string;
+          advertiser_id: string;
+          ad_package_id: string;
+          campaign_name: string;
+          status: AdCampaignStatus;
+          starts_at: string | null;
+          ends_at: string | null;
+          admin_notes: string | null;
+          total_price_cents: number;
+          payment_status: AdPaymentStatus;
+          invoice_reference: string | null;
+          paid_at: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          advertiser_id: string;
+          ad_package_id: string;
+          campaign_name: string;
+          status?: AdCampaignStatus;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          admin_notes?: string | null;
+          total_price_cents?: number;
+          payment_status?: AdPaymentStatus;
+          invoice_reference?: string | null;
+          paid_at?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          advertiser_id?: string;
+          ad_package_id?: string;
+          campaign_name?: string;
+          status?: AdCampaignStatus;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          admin_notes?: string | null;
+          total_price_cents?: number;
+          payment_status?: AdPaymentStatus;
+          invoice_reference?: string | null;
+          paid_at?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      ad_creatives: {
+        Row: {
+          id: string;
+          campaign_id: string;
+          label: string;
+          image_storage_path: string;
+          destination_url: string;
+          alt_text: string;
+          slot_type: AdSlotType;
+          width_px: number;
+          height_px: number;
+          file_size_bytes: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          campaign_id: string;
+          label?: string;
+          image_storage_path: string;
+          destination_url: string;
+          alt_text?: string;
+          slot_type: AdSlotType;
+          width_px: number;
+          height_px: number;
+          file_size_bytes?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          campaign_id?: string;
+          label?: string;
+          image_storage_path?: string;
+          destination_url?: string;
+          alt_text?: string;
+          slot_type?: AdSlotType;
+          width_px?: number;
+          height_px?: number;
+          file_size_bytes?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      ad_campaign_slots: {
+        Row: {
+          id: string;
+          campaign_id: string;
+          ad_slot_id: string;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          campaign_id: string;
+          ad_slot_id: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          campaign_id?: string;
+          ad_slot_id?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+      };
+      ad_impressions: {
+        Row: {
+          id: string;
+          ad_package_id: string | null;
+          session_token: string;
+          page_context: string;
+          ad_slot: string;
+          rendered_at: string;
+          ad_campaign_id: string | null;
+          ad_creative_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          ad_package_id?: string | null;
+          session_token: string;
+          page_context?: string;
+          ad_slot?: string;
+          rendered_at?: string;
+          ad_campaign_id?: string | null;
+          ad_creative_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          ad_package_id?: string | null;
+          session_token?: string;
+          page_context?: string;
+          ad_slot?: string;
+          rendered_at?: string;
+          ad_campaign_id?: string | null;
+          ad_creative_id?: string | null;
+          created_at?: string;
+        };
+      };
+      ad_clicks: {
+        Row: {
+          id: string;
+          impression_id: string | null;
+          ad_package_id: string | null;
+          session_token: string;
+          page_context: string;
+          clicked_at: string;
+          ad_campaign_id: string | null;
+          ad_creative_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          impression_id?: string | null;
+          ad_package_id?: string | null;
+          session_token: string;
+          page_context?: string;
+          clicked_at?: string;
+          ad_campaign_id?: string | null;
+          ad_creative_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          impression_id?: string | null;
+          ad_package_id?: string | null;
+          session_token?: string;
+          page_context?: string;
+          clicked_at?: string;
+          ad_campaign_id?: string | null;
+          ad_creative_id?: string | null;
+          created_at?: string;
+        };
+      };
+      ad_consent_log: {
+        Row: {
+          id: string;
+          user_id: string;
+          opted_out: boolean;
+          source: string;
+          ip_address: string | null;
+          user_agent: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          opted_out: boolean;
+          source?: string;
+          ip_address?: string | null;
+          user_agent?: string | null;
+          created_at?: string;
+        };
+        Update: never;
+      };
     };
     Enums: {
       service_type: ServiceType;
@@ -830,6 +1193,15 @@ export type ConsentLog = Database["public"]["Tables"]["consent_log"]["Row"];
 export type DeletionRequest = Database["public"]["Tables"]["deletion_requests"]["Row"];
 export type DataExportRequest = Database["public"]["Tables"]["data_export_requests"]["Row"];
 export type DpaRequest = Database["public"]["Tables"]["dpa_requests"]["Row"];
+export type Advertiser = Database["public"]["Tables"]["advertisers"]["Row"];
+export type AdPackage = Database["public"]["Tables"]["ad_packages"]["Row"];
+export type AdSlot = Database["public"]["Tables"]["ad_slots"]["Row"];
+export type AdCampaign = Database["public"]["Tables"]["ad_campaigns"]["Row"];
+export type AdCreative = Database["public"]["Tables"]["ad_creatives"]["Row"];
+export type AdCampaignSlot = Database["public"]["Tables"]["ad_campaign_slots"]["Row"];
+export type AdImpression = Database["public"]["Tables"]["ad_impressions"]["Row"];
+export type AdClick = Database["public"]["Tables"]["ad_clicks"]["Row"];
+export type AdConsentLog = Database["public"]["Tables"]["ad_consent_log"]["Row"];
 
 export interface InstallerProfileWithExperience extends InstallerProfile {
   installer_experience: InstallerExperience[];
